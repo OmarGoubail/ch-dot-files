@@ -1,0 +1,19 @@
+
+theme = catppuccin-macchiato 
+font-size = 10.5
+font-family = "GeistMono Nerd Font Mono"
+background-opacity = 0.9
+
+shell-integration = fish
+
+gtk-titlebar = false 
+
+clipboard-read = "allow"
+clipboard-paste-protection = false
+
+window-decoration = false
+
+confirm-close-surface = false
+
+
+cursor-style = block

@@ -1,0 +1,8 @@
+
+
+  .config/tmux/plugins/*
+
+  **/*.backup
+  **/*.bak
+
+  **/.DS_Store

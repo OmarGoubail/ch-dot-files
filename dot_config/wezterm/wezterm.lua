@@ -1,0 +1,289 @@
+local wezterm = require("wezterm")
+local act = wezterm.action
+local smart_splits = require("smart-splits")
+local workspaces = require("workspaces")
+
+-- Load smart workspace switcher plugin
+local workspace_switcher = wezterm.plugin.require("https://github.com/MLFlexer/smart_workspace_switcher.wezterm")
+
+local config = wezterm.config_builder()
+
+-- ==============================================
+-- BASIC SETTINGS
+-- ==============================================
+
+-- config.enable_wayland = true
+
+config.dpi = 384.0
+
+config.window_background_opacity = 0.8
+config.macos_window_background_blur = 20
+
+config.color_scheme = "Tokyo Night"
+config.font = wezterm.font("JetBrainsMono Nerd Font Mono")
+config.font_size = 12.0
+
+-- Tab bar settings
+config.show_tabs_in_tab_bar = true
+config.show_new_tab_button_in_tab_bar = false
+config.tab_bar_at_bottom = false
+config.use_fancy_tab_bar = true
+
+-- Pane settings
+config.inactive_pane_hsb = {
+	saturation = 0.9,
+	brightness = 0.7,
+}
+
+-- ==============================================
+-- KEY BINDINGS - LEADER KEY (replaces tmux prefix)
+-- ==============================================
+
+config.leader = { key = "a", mods = "CTRL", timeout_milliseconds = 2000 }
+
+config.keys = {
+	-- Send Ctrl-A when pressed twice (like tmux send-prefix)
+	{
+		key = "a",
+		mods = "LEADER|CTRL",
+		action = act.SendKey({ key = "a", mods = "CTRL" }),
+	},
+
+	-- ==============================================
+	-- PANE MANAGEMENT
+	-- ==============================================
+
+	-- Split panes (like tmux | and -)
+	{
+		key = "|",
+		mods = "LEADER|SHIFT",
+		action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }),
+	},
+	{
+		key = "-",
+		mods = "LEADER",
+		action = act.SplitVertical({ domain = "CurrentPaneDomain" }),
+	},
+
+	-- Smart navigation and resizing (integrated with Neovim via smart-splits.nvim)
+	-- This will seamlessly navigate between Neovim splits and WezTerm panes
+	-- Ctrl+hjkl for navigation, Alt+hjkl for resizing
+
+	-- Maximize/zoom pane (like tmux prefix + m)
+	{
+		key = "m",
+		mods = "LEADER",
+		action = act.TogglePaneZoomState,
+	},
+
+	-- Close pane
+	{
+		key = "x",
+		mods = "LEADER",
+		action = act.CloseCurrentPane({ confirm = true }),
+	},
+
+	-- ==============================================
+	-- TAB MANAGEMENT (replaces tmux windows)
+	-- ==============================================
+
+	-- Create new tab
+	{
+		key = "c",
+		mods = "LEADER",
+		action = act.SpawnTab("CurrentPaneDomain"),
+	},
+
+	-- Navigate between tabs
+	{
+		key = "n",
+		mods = "LEADER",
+		action = act.ActivateTabRelative(1),
+	},
+	{
+		key = "p",
+		mods = "LEADER",
+		action = act.ActivateTabRelative(-1),
+	},
+
+	-- Tab numbers (1-9)
+	{
+		key = "1",
+		mods = "LEADER",
+		action = act.ActivateTab(0),
+	},
+	{
+		key = "2",
+		mods = "LEADER",
+		action = act.ActivateTab(1),
+	},
+	{
+		key = "3",
+		mods = "LEADER",
+		action = act.ActivateTab(2),
+	},
+	{
+		key = "4",
+		mods = "LEADER",
+		action = act.ActivateTab(3),
+	},
+	{
+		key = "5",
+		mods = "LEADER",
+		action = act.ActivateTab(4),
+	},
+	{
+		key = "6",
+		mods = "LEADER",
+		action = act.ActivateTab(5),
+	},
+	{
+		key = "7",
+		mods = "LEADER",
+		action = act.ActivateTab(6),
+	},
+	{
+		key = "8",
+		mods = "LEADER",
+		action = act.ActivateTab(7),
+	},
+	{
+		key = "9",
+		mods = "LEADER",
+		action = act.ActivateTab(8),
+	},
+	-- rotate panes
+	{
+		mods = "LEADER",
+		key = "Space",
+		action = wezterm.action.RotatePanes("Clockwise"),
+	},
+	-- show the pane selection mode, but have it swap the active and selected panes
+	{
+		mods = "LEADER",
+		key = "0",
+		action = wezterm.action.PaneSelect({
+			mode = "SwapWithActive",
+		}),
+	},
+	-- search for the string "hash" matching regardless of case
+	{
+
+		mods = "LEADER",
+		key = "H",
+		action = act.Search({ CaseInSensitiveString = "" }),
+	},
+
+	-- ==============================================
+	-- COPY MODE (replaces tmux copy mode)
+	-- ==============================================
+
+	-- Enter copy mode (like tmux prefix + [)
+	{
+		key = "[",
+		mods = "LEADER",
+		action = act.ActivateCopyMode,
+	},
+
+	-- Paste (like tmux prefix + ])
+	{
+		key = "]",
+		mods = "LEADER",
+		action = act.PasteFrom("Clipboard"),
+	},
+
+	-- ==============================================
+	-- WORKSPACE MANAGEMENT (smart workspace switcher)
+	-- ==============================================
+
+	-- Switch workspace (like tmux session switcher)
+	{
+		key = "s",
+		mods = "LEADER",
+		action = workspace_switcher.switch_workspace(),
+	},
+
+	-- View open workspaces
+	{
+		key = "w",
+		mods = "LEADER",
+		action = act.ShowLauncherArgs({ flags = "WORKSPACES" }),
+	},
+
+	-- Show project shortcuts help
+	{
+		key = "?",
+		mods = "LEADER",
+		action = workspaces.show_project_help(),
+	},
+
+	-- Reload config (like tmux prefix + r)
+	{
+		key = "r",
+		mods = "LEADER",
+		action = act.ReloadConfiguration,
+	},
+	{
+		key = "P",
+		mods = "LEADER",
+		action = wezterm.action.ActivateCommandPalette,
+	},
+
+	-- ==============================================
+	-- TERMINAL FIXES
+	-- ==============================================
+
+	-- Shift+Enter fix for ghostty/wezterm
+	{
+		key = "Enter",
+		mods = "SHIFT",
+		action = act.SendString("\n"),
+	},
+}
+
+-- Add smart-splits navigation keys
+local smart_keys = smart_splits.get_smart_splits_keys()
+for _, key in ipairs(smart_keys) do
+	table.insert(config.keys, key)
+end
+
+-- Add custom project workspace keys
+local project_keys = workspaces.get_project_keys()
+for _, key in ipairs(project_keys) do
+	table.insert(config.keys, key)
+end
+
+-- ==============================================
+-- MOUSE SETTINGS
+-- ==============================================
+
+-- Mouse support - simplified
+config.mouse_bindings = {
+	-- Click and drag to select and copy
+	{
+		event = { Up = { streak = 1, button = "Left" } },
+		mods = "NONE",
+		action = act.CompleteSelection("ClipboardAndPrimarySelection"),
+	},
+
+	-- Ctrl+click - open hyperlink
+	{
+		event = { Up = { streak = 1, button = "Left" } },
+		mods = "CTRL",
+		action = act.OpenLinkAtMouseCursor,
+	},
+
+	-- Alt+left click - block/rectangular selection
+	{
+		event = { Down = { streak = 1, button = "Left" } },
+		mods = "ALT",
+		action = act.SelectTextAtMouseCursor("Block"),
+	},
+	{
+		event = { Up = { streak = 1, button = "Left" } },
+		mods = "ALT",
+		action = act.CompleteSelection("ClipboardAndPrimarySelection"),
+	},
+}
+
+return config

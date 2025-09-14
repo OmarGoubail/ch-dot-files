@@ -1,0 +1,311 @@
+// Zed settings
+//
+// For information on how to configure Zed, see the Zed
+// documentation: https://zed.dev/docs/configuring-zed
+//
+// To see all of Zed's default settings without changing your
+// custom settings, run the `open default settings` command
+// from the command palette or from `Zed` application menu.
+{
+  /* Duplicated key auto-commented: "agent": {
+    "dock": "bottom",
+    "version": "2"
+  }, */
+  "context_servers": {
+    "jump-admin": {
+      "command": {
+        "path": "mcp-proxy",
+        "args": ["http://localhost:4000/admin/mcp"],
+        "env": {
+          "API_ACCESS_TOKEN": "jmp_admin_cwthqFsMn-Vxd7NIR6vNqMzrn1etcF-CERtY3bZpqtONJqL1JKw5Aqz0XMMIuiQJ"
+        }
+      }
+    },
+    // "jump-mcp": {
+    //   "command": {
+    //     "path": "mcp-proxy",
+    //     "args": ["http://localhost:4000/mcp"]
+    //   }
+    // },
+    "tidewave-mcp": {
+      "command": {
+        "path": "mcp-proxy",
+        "args": ["http://localhost:4000/tidewave/mcp"],
+        "env": null
+      },
+      "settings": {}
+    }
+  },
+  "git_panel": {
+    "dock": "right"
+  },
+  // "minimap": {
+  //   "show": "always"
+  // },
+  "edit_predictions": {
+    "mode": "subtle",
+    "copilot": {
+      "proxy": null,
+      "proxy_no_verify": null
+    },
+    "enabled_in_text_threads": false
+  },
+  "icon_theme": "Colored Zed Icons Theme Dark",
+  "features": {
+    "edit_prediction_provider": "zed"
+  },
+  "agent": {
+    "profiles": {
+      "tidewave": {
+        "name": "tidewave",
+        "tools": {
+          "create_directory": true,
+          "terminal": true,
+          "batch_tool": true,
+          "code_actions": true,
+          "code_symbols": true,
+          "contents": true,
+          "copy_path": true,
+          "create_file": true,
+          "delete_path": true,
+          "diagnostics": true,
+          "edit_file": true,
+          "fetch": true,
+          "list_directory": true,
+          "move_path": true,
+          "now": true,
+          "find_path": true,
+          "read_file": true,
+          "grep": true,
+          "rename": true,
+          "symbol_info": true,
+          "thinking": true,
+          "web_search": true
+        },
+        "enable_all_context_servers": true,
+        "context_servers": {
+          "mcp-server-context7": {
+            "tools": {
+              "get-library-docs": true,
+              "resolve-library-id": true
+            }
+          },
+          "tidewave-mcp": {
+            "tools": {
+              "project_eval": true,
+              "package_search": true,
+              "package_docs_search": true,
+              "get_docs": true,
+              "get_source_location": true,
+              "get_logs": true,
+              "get_models": true,
+              "get_schemas": true,
+              "execute_sql_query": false
+            }
+          },
+          "mcp-server-sequential-thinking": {
+            "tools": {
+              "sequentialthinking": false
+            }
+          }
+        }
+      },
+      "write": {
+        "name": "Write",
+        "tools": {
+          "create_directory": true,
+          "terminal": true,
+          "batch_tool": true,
+          "code_actions": true,
+          "code_symbols": true,
+          "contents": true,
+          "copy_path": true,
+          "create_file": true,
+          "delete_path": true,
+          "diagnostics": true,
+          "edit_file": true,
+          "fetch": true,
+          "list_directory": true,
+          "move_path": true,
+          "now": true,
+          "find_path": true,
+          "read_file": true,
+          "grep": true,
+          "rename": true,
+          "symbol_info": true,
+          "thinking": true,
+          "web_search": true
+        },
+        "enable_all_context_servers": true,
+        "context_servers": {
+          "mcp-server-sequential-thinking": {
+            "tools": {
+              "sequentialthinking": false
+            }
+          }
+        }
+      }
+    },
+    "always_allow_tool_actions": true,
+    "default_profile": "tidewave",
+    "inline_assistant_model": {
+      "provider": "anthropic",
+      "model": "claude-3-5-haiku-latest"
+    },
+    "dock": "left",
+    "default_model": {
+      "provider": "google",
+      "model": "gemini-2.5-pro-preview-latest"
+    },
+    "version": "2"
+  },
+  "base_keymap": "VSCode",
+  "theme": "One Dark",
+  // "experimental.theme_overrides": {
+  //   "background": "#24273aCC", // CC = 80% opacity
+  //   "editor.background": "#24273a99", // 99 = 60% opacity
+  //   "editor.gutter.background": "#24273a99",
+  //   "tab_bar.background": "#24273aB3", // B3 = 70% opacity
+  //   "terminal.background": "#24273a99",
+  //   "toolbar.background": "#24273aB3",
+  //   "tab.active_background": "#363a4cCC", // Slightly lighter than background
+  //   "tab.inactive_background": "#24273a80", // 80 = 50% opacity
+  //   "status_bar.background": "#24273aB3",
+  //   "title_bar.background": "#24273aCC",
+  //   "panel.background": "#24273a99",
+  //   // when generating text with AI, I need to make sure the text is readable
+  //   "editor.foreground": "#ffffff", // White text for better contrast
+  //   "editor.inlay_hint.foreground": "#ffffff80", // Semi-transparent white for inlay hints
+  //   "editor.suggest.foreground": "#ffffff", // White text for suggestions
+  //   "editor.hover.foreground": "#ffffff" // White text for hover information
+  // },
+  "ui_font_size": 14.5,
+  "buffer_font_size": 12,
+  "buffer_font_family": "JetBrainsMono Nerd Font Mono",
+  // Vim mode settings
+  "vim_mode": true,
+  // use relative line numbers
+  "relative_line_numbers": false,
+  "tab_bar": {
+    "show": true
+  },
+  "scrollbar": {
+    "show": "never"
+  },
+  // Indentation, rainbow indentation
+  "indent_guides": {
+    "enabled": true,
+    "coloring": "indent_aware"
+  },
+  // NOTE: Zen mode, refer https://github.com/zed-industries/zed/issues/4382 when it's resolved
+  "centered_layout": {
+    "left_padding": 0.2,
+    "right_padding": 0.2
+  },
+  // Local AI with Ollama, refer https://zed.dev/docs/language-model-integration?highlight=ollama#using-ollama-on-macos
+  // "assistant": {
+  //   "version": "1",
+  //   "provider": {
+  //     "default_model": {
+  //       // Run `ollama pull llama3:latest` to download the model
+  //       "name": "llama3:latest",
+  //       "max_tokens": 2048,
+  //       "keep_alive": -1
+  //     },
+  //     "name": "ollama"
+  //   }
+  // },
+  // "language_models": {
+  //   "ollama": {
+  //     "api_url": "http://localhost:11434"
+  //   }
+  // },
+  // Inlay hints preconfigured by Zed: Go, Rust, Typescript and Svelte
+  "inlay_hints": {
+    "enabled": false
+  },
+  // LSP
+  "lsp": {
+    "tailwindcss-language-server": {
+      "settings": {
+        "classAttributes": ["class", "className", "ngClass", "styles"]
+      }
+    }
+  },
+  "languages": {
+    // Refer https://zed.dev/docs/languages/javascript and https://zed.dev/docs/languages/typescript for more info
+    "Markdown": {
+      "show_edit_predictions": false
+    },
+    "TypeScript": {
+      // Refer https://github.com/jellydn/ts-inlay-hints for how to setup for Neovim and VSCode
+      "inlay_hints": {
+        "enabled": true,
+        "show_parameter_hints": false,
+        "show_other_hints": true,
+        "show_type_hints": true
+      }
+    },
+    "Terraform": {
+      "format_on_save": "on",
+      "formatter": "language_server"
+    },
+    "Elixir": {
+      "format_on_save": {
+        "external": {
+          "command": "mix",
+          "arguments": ["format", "--stdin-filename", "{buffer_path}", "-"]
+        }
+      },
+      "language_servers": ["elixir-ls", "!next-ls", "!lexical"]
+    },
+    "HEEX": {
+      "format_on_save": {
+        "external": {
+          "command": "mix",
+          "arguments": ["format", "--stdin-filename", "{buffer_path}", "-"]
+        }
+      },
+      "language_servers": ["elixir-ls", "!next-ls", "!lexical"]
+    }
+  },
+  // Use zed commit editor
+  "terminal": {
+    "dock": "right",
+    "env": {
+      "EDITOR": "zed --wait"
+    },
+    "working_directory": "current_project_directory"
+  },
+  // File syntax highlighting
+  "file_types": {
+    "Dockerfile": ["Dockerfile", "Dockerfile.*"],
+    "JSON": ["json", "jsonc", "*.code-snippets"],
+    "HEEX": ["heex", "eex"]
+  },
+  // Turn off telemetry
+  "telemetry": {
+    "diagnostics": false,
+    "metrics": false
+  },
+  // Move all panel to the right
+  "project_panel": {
+    "button": true,
+    "dock": "right",
+    "git_status": true,
+    "auto_fold_dirs": false
+  },
+  "outline_panel": {
+    "dock": "right"
+  },
+  "collaboration_panel": {
+    "dock": "left"
+  },
+  // Move some unnecessary panels to the left
+  "notification_panel": {
+    "dock": "left"
+  },
+  "chat_panel": {
+    "dock": "left"
+  }
+}

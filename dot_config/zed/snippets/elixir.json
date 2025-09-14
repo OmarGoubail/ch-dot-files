@@ -1,0 +1,20 @@
+{
+  "snippets": {
+    "Pipe Operator": {
+      "prefix": "pp",
+      "body": "|> "
+    },
+    "Add Debug Logger Lever": {
+      "prefix": "debugloggerlevel",
+      "body": "Logger.put_module_level(__Module__, :debug)"
+    },
+    "EEx Embedded Expression": {
+      "prefix": "eex",
+      "body": "<%= ${1:@variable} %>"
+    },
+    "Expand": {
+      "prefix": "expand",
+      "body": "-- this is what was expanded!"
+    }
+  }
+}

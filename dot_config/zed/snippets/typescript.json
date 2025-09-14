@@ -1,0 +1,103 @@
+{
+  "Solid Component": {
+    "prefix": "scomp",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "import { type Component } from 'solid-js';",
+      "",
+      "type ${1:ComponentName}Props = {",
+      "  $2",
+      "};",
+      "",
+      "export default function ${1:ComponentName}(props: Component<${1:ComponentName}Props>): JSX.Element {",
+      "  return (",
+      "    $0",
+      "  );",
+      "}"
+    ],
+    "description": "Create a Solid-JS component with TypeScript"
+  },
+  "Solid Parent Component": {
+    "prefix": "spcomp",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "import { type Component, type ParentComponent } from 'solid-js';",
+      "",
+      "type ${1:ComponentName}Props = {",
+      "  $2",
+      "};",
+      "",
+      "export default function ${1:ComponentName}(props: ${1:ComponentName}Props & ParentComponent): JSX.Element {",
+      "  return (",
+      "    $0",
+      "  );",
+      "}"
+    ],
+    "description": "Create a Solid-JS parent component with TypeScript"
+  },
+  "Solid Component Function": {
+    "prefix": "scompfn",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "import { type Component } from 'solid-js';",
+      "",
+      "type ${1:ComponentName}Props = {",
+      "  $2",
+      "};",
+      "",
+      "function ${1:ComponentName}(props: Component<${1:ComponentName}Props>): JSX.Element {",
+      "  return (",
+      "    $0",
+      "  );",
+      "}"
+    ],
+    "description": "Create a Solid-JS component with TypeScript as function"
+  },
+  "Solid Signal": {
+    "prefix": "ssig",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "const [${1:signal}, set${1/(.*)/${1:/capitalize}/}] = createSignal<${2:type}>(${3:initialValue});"
+    ],
+    "description": "Create a Solid-JS signal"
+  },
+  "Solid Effect": {
+    "prefix": "seff",
+    "scope": "typescript,typescriptreact",
+    "body": ["createEffect(() => {", "  $0", "});"],
+    "description": "Create a Solid-JS effect"
+  },
+  "Solid For": {
+    "prefix": "sfor",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "<For each={${1:items}}>",
+      "  {(${2:item}) => (",
+      "    $0",
+      "  )}",
+      "</For>"
+    ],
+    "description": "Create a Solid-JS For component"
+  },
+  "Solid Show": {
+    "prefix": "sshow",
+    "scope": "typescript,typescriptreact",
+    "body": ["<Show when={${1:condition}}>", "  $0", "</Show>"],
+    "description": "Create a Solid-JS Show component"
+  },
+  "Solid Switch/Match": {
+    "prefix": "sswitch",
+    "scope": "typescript,typescriptreact",
+    "body": [
+      "<Switch>",
+      "  <Match when={${1:condition}}>",
+      "    $0",
+      "  </Match>",
+      "  <Match when={${2:condition}}>",
+      "    ",
+      "  </Match>",
+      "</Switch>"
+    ],
+    "description": "Create a Solid-JS Switch/Match component"
+  }
+}
