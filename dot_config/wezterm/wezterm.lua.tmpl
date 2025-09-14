@@ -12,9 +12,12 @@ local config = wezterm.config_builder()
 -- BASIC SETTINGS
 -- ==============================================
 
--- config.enable_wayland = true
-
+{{- if eq .chezmoi.os "linux" }}
+config.enable_wayland = true
 config.dpi = 384.0
+{{- else if eq .chezmoi.os "darwin" }}
+-- No explicit DPI needed for macOS
+{{- end }}
 
 config.window_background_opacity = 0.8
 config.macos_window_background_blur = 20
