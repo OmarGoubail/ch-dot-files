@@ -86,6 +86,16 @@ config.keys = {
 		action = act.CloseCurrentPane({ confirm = true }),
 	},
 
+	-- Enter resize mode (like tmux)
+	{
+		key = "r",
+		mods = "LEADER",
+		action = act.ActivateKeyTable({
+			name = "resize_pane",
+			one_shot = false,
+		}),
+	},
+
 	-- ==============================================
 	-- TAB MANAGEMENT (replaces tmux windows)
 	-- ==============================================
@@ -220,10 +230,10 @@ config.keys = {
 		action = workspaces.show_project_help(),
 	},
 
-	-- Reload config (like tmux prefix + r)
+	-- Reload config - changed to Leader+R (uppercase) to avoid conflict with resize mode
 	{
-		key = "r",
-		mods = "LEADER",
+		key = "R",
+		mods = "LEADER|SHIFT",
 		action = act.ReloadConfiguration,
 	},
 	{
@@ -286,6 +296,31 @@ config.mouse_bindings = {
 		event = { Up = { streak = 1, button = "Left" } },
 		mods = "ALT",
 		action = act.CompleteSelection("ClipboardAndPrimarySelection"),
+	},
+}
+
+-- ==============================================
+-- KEY TABLES (for modal bindings like resize mode)
+-- ==============================================
+
+config.key_tables = {
+	-- Resize mode: Activated by Leader+r
+	resize_pane = {
+		{ key = "h", action = act.AdjustPaneSize({ "Left", 3 }) },
+		{ key = "j", action = act.AdjustPaneSize({ "Down", 3 }) },
+		{ key = "k", action = act.AdjustPaneSize({ "Up", 3 }) },
+		{ key = "l", action = act.AdjustPaneSize({ "Right", 3 }) },
+		
+		-- Larger adjustments with shift
+		{ key = "H", mods = "SHIFT", action = act.AdjustPaneSize({ "Left", 10 }) },
+		{ key = "J", mods = "SHIFT", action = act.AdjustPaneSize({ "Down", 10 }) },
+		{ key = "K", mods = "SHIFT", action = act.AdjustPaneSize({ "Up", 10 }) },
+		{ key = "L", mods = "SHIFT", action = act.AdjustPaneSize({ "Right", 10 }) },
+		
+		-- Exit resize mode
+		{ key = "Escape", action = "PopKeyTable" },
+		{ key = "Enter", action = "PopKeyTable" },
+		{ key = "q", action = "PopKeyTable" },
 	},
 }
 

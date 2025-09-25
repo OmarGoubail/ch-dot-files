@@ -60,11 +60,8 @@ function M.get_smart_splits_keys()
     smart_split_nav('move', 'k'),
     smart_split_nav('move', 'l'),
     
-    -- Resizing panes/splits (Alt + hjkl)
-    smart_split_nav('resize', 'h'),
-    smart_split_nav('resize', 'j'),
-    smart_split_nav('resize', 'k'),
-    smart_split_nav('resize', 'l'),
+    -- NOTE: Alt + hjkl resize bindings removed to avoid conflicts with aerospace
+    -- Use Ctrl+/- for resizing instead (defined in main wezterm config)
   }
 end
 
