@@ -92,17 +92,17 @@ automatically-unhide-macos-hidden-apps = false
     # You can uncomment the following lines to open up terminal with alt + enter shortcut
     # (like in i3)
 
-# alt-enter = "exec-and-forget open -a WezTerm"
-ctrl-enter = '''exec-and-forget osascript -e "
- tell application \"Ghostty\"
-if it is running then
-    activate
-    tell application \"System Events\" to keystroke \"n\" using {command down}
-else
-    activate
-end if
- end tell
- "'''
+alt-enter = "exec-and-forget open -a WezTerm"
+# ctrl-enter = '''exec-and-forget osascript -e "
+#  tell application \"Ghostty\"
+# if it is running then
+#     activate
+#     tell application \"System Events\" to keystroke \"n\" using {command down}
+# else
+#     activate
+# end if
+#  end tell
+#  "'''
     # tell application "Terminal"
     #     do script
     #     activate

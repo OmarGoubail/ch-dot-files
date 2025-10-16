@@ -1,11 +1,3 @@
-if status is-interactive
-    # Commands to run in interactive sessions can go here
-    #fish_vi_key_bindings
-    if command -v atuin >/dev/null
-        atuin init fish | source
-    end
-end
-
 # Detect OS
 set -l os_name (uname -s)
 set -l arch_name (uname -m)
@@ -17,6 +9,12 @@ switch $os_name
         set -gx PATH /opt/homebrew/bin /opt/homebrew/sbin $PATH
         if test -f /opt/homebrew/bin/brew
             eval (/opt/homebrew/bin/brew shellenv)
+        end
+
+        # Now Atuin will be found
+        if command -v atuin >/dev/null
+            atuin init fish | source
+
         end
 
         if command -v zoxide >/dev/null
@@ -36,6 +34,10 @@ switch $os_name
 
         if command -v zoxide >/dev/null
             zoxide init fish | source
+        end
+
+        if command -v atuin >/dev/null
+            atuin init fish | source
         end
 
         # Java
