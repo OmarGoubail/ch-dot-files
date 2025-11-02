@@ -3,8 +3,6 @@
   "theme": "system",
   "keybinds": {
     "leader": "ctrl+x",
-    "app_help": "<leader>h",
-    "switch_mode": "tab",
     "editor_open": "<leader>e",
     "session_new": "<leader>n",
     "session_list": "<leader>l",
@@ -12,14 +10,12 @@
     "session_unshare": "<leader>u",
     "session_interrupt": "esc",
     "session_compact": "<leader>c",
-    "tool_details": "<leader>d",
     "model_list": "<leader>m",
     "theme_list": "<leader>t",
-    "project_init": "<leader>i",
     "input_clear": "ctrl+c",
     "input_paste": "ctrl+v",
     "input_submit": "enter",
-    "input_newline": "shift+enter",
+    "input_newline": "",
     "messages_page_up": "pgup",
     "messages_page_down": "pgdown",
     "messages_half_page_up": "ctrl+alt+u",
@@ -28,5 +24,29 @@
     "messages_last": "ctrl+alt+g",
     "messages_copy": "<leader>y",
     "app_exit": "ctrl+c,<leader>q"
+  },
+  "mcp": {
+    "figma": {
+      "type": "remote",
+      "url": "http://127.0.0.1:3845/mcp",
+      "enabled": true
+    }
+  },
+  "tools": {
+    "figma": false
+  },
+  "agent": {
+    "agent-figma": {
+      "description": "Figma subagent. Uses the Figma MCP to read node context and help generate implementation-ready code.",
+      "mode": "subagent",
+      "model": "claude-haiku-4-5",
+      "tools": {
+        "figma": true,
+        "write": false,
+        "edit": false,
+        "bash": false
+      },
+      "prompt": "You are a Figma specialist. When given a Figma URL, fetch node context via the Figma MCP and produce precise, minimal code following the project’s conventions."
+    }
   }
 }
