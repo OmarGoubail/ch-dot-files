@@ -48,5 +48,31 @@
       },
       "prompt": "You are a Figma specialist. When given a Figma URL, fetch node context via the Figma MCP and produce precise, minimal code following the project’s conventions."
     }
+  },
+  "plugin": [
+    "oh-my-opencode",
+    "opencode-openai-codex-auth"
+  ],
+  "provider": {
+    "openai": {
+      "name": "OpenAI",
+      "api": "codex",
+      "models": {
+        "gpt-5.2": {
+          "name": "GPT-5.2"
+        },
+        "o3": {
+          "name": "o3",
+          "thinking": true
+        },
+        "o4-mini": {
+          "name": "o4-mini",
+          "thinking": true
+        },
+        "codex-1": {
+          "name": "Codex-1"
+        }
+      }
+    }
   }
 }
