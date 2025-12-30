@@ -45,7 +45,7 @@
     "agent-figma": {
       "description": "Figma design context extractor. Fetches node structure, styles, and layout from Figma URLs. Returns implementation-ready specs without bloating main context.",
       "mode": "subagent",
-      "model": "claude-haiku-4-5",
+      "model": "anthropic/claude-haiku-4-5",
       "tools": {
         "figma": true,
         "write": false,
@@ -58,7 +58,7 @@
     "agent-tidewave": {
       "description": "Phoenix runtime intelligence agent. Uses Tidewave MCP to execute code, query database, inspect schemas, read logs, and access docs from your RUNNING Phoenix app. Returns actionable runtime data without polluting main context.",
       "mode": "subagent",
-      "model": "claude-haiku-4-5",
+      "model": "anthropic/claude-haiku-4-5",
       "tools": {
         "tidewave": true,
         "write": false,
