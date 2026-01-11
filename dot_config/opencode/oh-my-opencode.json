@@ -1,9 +1,21 @@
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  "disabled_hooks": ["todo-continuation-enforcer"],
+  "disabled_hooks": [
+    "todo-continuation-enforcer"
+  ],
+  "sisyphus_agent": {
+    "default_builder_enabled": true,
+    "planner_enabled": true
+  },
   "agents": {
     "Sisyphus": {
       "model": "opencode/claude-opus-4-5"
+    },
+    "Prometheus (Planner)": {
+      "model": "opencode/claude-opus-4-5"
+    },
+    "OpenCode-Builder": {
+      "model": "opencode/glm-4.7-free"
     },
     "oracle": {
       "model": "opencode/gpt-5.2"
