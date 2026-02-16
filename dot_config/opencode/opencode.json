@@ -71,7 +71,6 @@
   },
   "plugin": [
     "oh-my-opencode",
-    "opencode-openai-codex-auth"
   ],
   "provider": {
     "openai": {

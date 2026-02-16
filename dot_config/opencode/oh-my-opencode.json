@@ -1,36 +1,85 @@
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "disabled_hooks": [
-    "todo-continuation-enforcer"
+    "todo-continuation-enforcer",
+    "ralph-loop",
+    "background-notification",
+    "task-reminder",
+    "session-notification",
+    "agent-usage-reminder",
+    "category-skill-reminder",
+    "auto-update-checker",
+    "start-work",
+    "auto-slash-command",
+    "directory-agents-injector",
+    "directory-readme-injector",
+    "rules-injector",
+    "compaction-context-injector",
+    "compaction-todo-preserver",
+    "claude-code-hooks",
+    "sisyphus-junior-notepad",
+    "prometheus-md-only",
+    "context-window-monitor",
+    "tool-output-truncator",
+    "thinking-block-validator",
+    "unstable-agent-babysitter"
   ],
+  "disabled_agents": [
+    "OpenCode-Builder",
+    "atlas",
+    "Metis (Plan Consultant)",
+    "momus",
+    "document-writer"
+  ],
+  "disabled_categories": [
+    "ultrabrain",
+    "deep",
+    "artistry",
+    "unspecified-low",
+    "unspecified-high"
+  ],
+  "tmux": {
+    "enabled": false
+  },
   "sisyphus_agent": {
-    "default_builder_enabled": true,
+    "default_builder_enabled": false,
     "planner_enabled": true
+  },
+  "browser_automation_engine": {
+    "provider": "agent-browser"
+  },
+  "categories": {
+    "visual-engineering": {
+      "model": "opencode/kimi-k2.5"
+    },
+    "quick": {
+      "model": "opencode/kimi-k2.5"
+    },
+    "writing": {
+      "model": "opencode/gemini-3-flash"
+    }
   },
   "agents": {
     "Sisyphus": {
-      "model": "opencode/claude-opus-4-5"
+      "model": "opencode/kimi-k2.5"
+    },
+    "Sisyphus-Junior": {
+      "model": "opencode/kimi-k2.5"
     },
     "Prometheus (Planner)": {
-      "model": "opencode/claude-opus-4-5"
-    },
-    "OpenCode-Builder": {
-      "model": "opencode/glm-4.7-free"
+      "model": "opencode/gpt-5.2"
     },
     "oracle": {
       "model": "opencode/gpt-5.2"
     },
     "librarian": {
-      "model": "opencode/glm-4.7-free"
+      "model": "opencode/kimi-k2.5"
     },
     "explore": {
-      "model": "opencode/grok-code"
+      "model": "opencode/kimi-k2.5"
     },
     "frontend-ui-ux-engineer": {
       "model": "opencode/gemini-3-pro"
-    },
-    "document-writer": {
-      "model": "opencode/gemini-3-flash"
     },
     "multimodal-looker": {
       "model": "opencode/gemini-3-flash"
