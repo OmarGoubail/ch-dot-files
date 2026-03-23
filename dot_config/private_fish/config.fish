@@ -117,6 +117,23 @@ starship init fish | source
 
 abbr cld claude --dangerously-skip-permissions
 
+# WorkTrunk aliases
+abbr wts 'wt switch'
+abbr wtl 'wt list --full'
+abbr wtm 'wt merge'
+abbr wtr 'wt remove'
+abbr wta 'wt switch -x opencode -c'
+abbr wtpl 'wt step prune --dry-run'
+
+# WorkTrunk function: create worktree with cache copy
+function wtc
+    if test (count $argv) -eq 0
+        echo "Usage: wtc <branch-name>"
+        return 1
+    end
+    wt switch --create $argv[1] && wt step copy-ignored
+end
+
 # /home/omargoubail/.local/bin/mise activate fish | source # added by https://mise.run/fish
 if status is-interactive
     mise activate fish | source
