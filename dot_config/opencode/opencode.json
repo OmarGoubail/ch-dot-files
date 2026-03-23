@@ -35,6 +35,14 @@
       "type": "remote",
       "url": "http://localhost:4000/tidewave/mcp",
       "enabled": true
+    },
+    "linear": {
+      "type": "remote",
+      "url": "https://mcp.linear.app/mcp",
+      "enabled": true,
+      "oauth": {
+        "scope": "read write"
+      }
     }
   },
   "tools": {
