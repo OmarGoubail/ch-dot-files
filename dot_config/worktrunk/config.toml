@@ -1,0 +1,15 @@
+# WorkTrunk configuration
+# https://worktrunk.dev/config/
+
+[hooks.post-start]
+# Automatically copy gitignored files (build caches, deps) from main worktree
+# Eliminates cold starts for Elixir, Node, Rust, etc.
+copy = "wt step copy-ignored"
+
+[hooks.post-merge]
+# Clean up after merging
+message = "Merged {{ branch }}"
+
+[commit]
+# Default staging behavior for commits
+stage = "all"
