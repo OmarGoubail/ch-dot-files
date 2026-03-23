@@ -14,9 +14,24 @@ return {
         use_as_default_explorer = false,
       },
       content = {
-        -- Filter out certain directories/files
+        -- Filter out certain directories/files for performance (124k+ files in Jump project)
         filter = function(entry)
-          local excluded_dirs = { ".git", "node_modules", "build", "dist" }
+          local excluded_dirs = { 
+            ".git", 
+            "node_modules", 
+            "_build", 
+            "deps", 
+            "build", 
+            "dist",
+            ".elixir_ls",
+            ".expert",
+            ".elixir_tools",
+            "priv/static/assets",
+            "cover",
+            "doc",
+            "tmp",
+            ".venv",
+          }
           for _, dir in ipairs(excluded_dirs) do
             if entry.name:match(dir) then
               return false -- Exclude matching entries

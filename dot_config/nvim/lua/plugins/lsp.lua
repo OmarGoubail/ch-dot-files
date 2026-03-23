@@ -2,6 +2,17 @@ return {
   "neovim/nvim-lspconfig",
   opts = {
     servers = {
+      -- Configure expert-ls (the new official Elixir LSP)
+      expert = {
+        cmd = { "/Users/omargoubail/.local/bin/expert_darwin_arm64", "--stdio" },
+        settings = {
+          elixir = {
+            dialyzerEnabled = true,
+            enableTestLenses = true,
+            suggestSpecs = true,
+          },
+        },
+      },
       tailwindcss = {
         filetypes = { "html", "elixir", "eelixir", "heex" },
         root_dir = function(fname)
@@ -45,6 +56,24 @@ return {
           },
         },
       },
+    },
+    -- Setup functions to enable expert and disable elixirls
+    setup = {
+      expert = function(_, opts)
+        -- Enable expert LSP for Neovim 0.11+
+        if vim.fn.has("nvim-0.11") == 1 then
+          vim.lsp.enable("expert", true)
+        end
+        require("lspconfig").expert.setup(opts)
+        return true
+      end,
+      elixirls = function()
+        -- Disable elixirls completely
+        if vim.fn.has("nvim-0.11") == 1 then
+          vim.lsp.enable("elixirls", false)
+        end
+        return true
+      end,
     },
   },
 }

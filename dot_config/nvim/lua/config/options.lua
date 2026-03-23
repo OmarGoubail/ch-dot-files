@@ -47,6 +47,31 @@ vim.o.autoread = true
 vim.opt.exrc = true
 -- vim.opt.secure = true
 
+-- Performance: Ignore huge directories for file watchers (124k+ files in Jump project)
+vim.opt.wildignore:append({
+  "*/_build/*",
+  "*/deps/*",
+  "*/node_modules/*",
+  "*/assets/node_modules/*",
+  "*/.elixir_ls/*",
+  "*/.expert/*",
+  "*/.git/*",
+  "*/priv/static/assets/*",
+  "*/cover/*",
+  "*/doc/*",
+  "*/tmp/*",
+  "*/.venv/*",
+  "*/.tox/*",
+  "*/.pytest_cache/*",
+  "*/__pycache__/*",
+  "*.pyc",
+  "*.pyo",
+  "*.egg-info/*",
+})
+
+-- Reduce file watch delay
+vim.opt.updatetime = 250
+
 vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
   pattern = "*",
   callback = function()
