@@ -6,8 +6,6 @@ shell-integration = fish
 
 copy-on-select = clipboard
 
-# Mouse scrolling - reduce speed for tmux compatibility
-# Default is discrete:3,precision:0.1, lower values = slower scrolling
 mouse-scroll-multiplier = discrete:1,precision:0.5
 
 gtk-titlebar = false 
@@ -27,4 +25,6 @@ confirm-close-surface = false
 cursor-style = block
 
 
-keybind = shift+enter=text:\x1b
+# Try kitty keyboard protocol sequence instead of plain newline
+# This sends the proper escape sequence that terminal apps expect for Shift+Enter
+keybind = shift+enter=csi:13;2u
