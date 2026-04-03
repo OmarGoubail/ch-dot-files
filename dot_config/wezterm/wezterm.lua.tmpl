@@ -267,6 +267,24 @@ for _, key in ipairs(project_keys) do
 end
 
 -- ==============================================
+-- SCROLL BINDINGS (half page up/down)
+-- ==============================================
+
+-- Scroll half page up with Ctrl+Alt+U
+table.insert(config.keys, {
+	key = "u",
+	mods = "CTRL|ALT",
+	action = act.ScrollByPage(-0.5),
+})
+
+-- Scroll half page down with Ctrl+Alt+D
+table.insert(config.keys, {
+	key = "d",
+	mods = "CTRL|ALT",
+	action = act.ScrollByPage(0.5),
+})
+
+-- ==============================================
 -- MOUSE SETTINGS
 -- ==============================================
 
