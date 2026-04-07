@@ -212,16 +212,23 @@ function _G.statusline()
     s = s .. "%#StDiagHint# " .. diag[sev.HINT] .. " "
   end
 
-  -- LSP progress
+  -- LSP progress (truncated)
   local progress = vim.lsp.status()
   if progress and progress ~= "" then
+    if #progress > 20 then
+      progress = progress:sub(1, 17) .. "..."
+    end
     s = s .. "%#StLsp# " .. progress .. " "
   end
 
-  -- LSP client name
+  -- LSP client names (show all attached)
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   if #clients > 0 then
-    s = s .. "%#StLsp# " .. clients[1].name .. " "
+    local names = {}
+    for _, c in ipairs(clients) do
+      table.insert(names, c.name)
+    end
+    s = s .. "%#StLsp# " .. table.concat(names, ", ") .. " "
   end
 
   -- Separator
@@ -237,3 +244,10 @@ function _G.statusline()
 end
 
 vim.o.statusline = "%!v:lua.statusline()"
+
+-- Redraw statusline on LSP progress updates
+vim.api.nvim_create_autocmd("LspProgress", {
+  callback = function()
+    vim.cmd.redrawstatus()
+  end,
+})
