@@ -20,9 +20,10 @@ require("config.options")
 -- Load plugins via vim.pack (Neovim 0.12 built-in package manager)
 require("plugins")
 
--- Load autocmds and keymaps after plugins
+-- Load autocmds, keymaps, and pack management after plugins
 require("config.autocmds")
 require("config.keymaps")
+require("config.pack")
 
 -- Colorscheme (with fallback)
 local ok = pcall(vim.cmd.colorscheme, "tokyonight")
