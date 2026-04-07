@@ -47,7 +47,14 @@ pcall(function()
 		window = {
 			position = "left",
 			width = 30,
-			mappings = { ["<space>"] = "none" },
+			mappings = {
+				["<space>"] = "none",
+				-- Pass through to smart-splits instead of neo-tree handling these
+				["<C-h>"] = "none",
+				["<C-j>"] = "none",
+				["<C-k>"] = "none",
+				["<C-l>"] = "none",
+			},
 		},
 		default_component_configs = {
 			indent = {

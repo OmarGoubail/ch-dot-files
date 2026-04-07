@@ -14,6 +14,15 @@ pcall(function()
   require("mason").setup({
     ui = { border = "single" },
   })
+  -- Add mason bin to PATH so vim.lsp.config can find installed servers
+  -- Check both nvim-exp and shared nvim mason directories
+  local mason_bin = vim.fn.stdpath("data") .. "/mason/bin"
+  local shared_mason_bin = vim.fn.expand("~/.local/share/nvim/mason/bin")
+  for _, bin_dir in ipairs({ mason_bin, shared_mason_bin }) do
+    if not vim.env.PATH:find(bin_dir, 1, true) then
+      vim.env.PATH = bin_dir .. ":" .. vim.env.PATH
+    end
+  end
 end)
 
 -------------------------------------------------------------------------------
@@ -69,6 +78,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
       vim.lsp.completion.enable(true, client.id, buf, { autotrigger = true })
     end
 
+    -- Manual completion trigger: <C-Space>
+    bmap("i", "<C-Space>", "<C-x><C-o>", "Trigger Completion")
+
     -- Enable inlay hints if supported
     if client:supports_method("textDocument/inlayHint") then
       vim.lsp.inlay_hint.enable(true, { bufnr = buf })
@@ -76,10 +88,12 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     -- Enable codelens if supported
     if client:supports_method("textDocument/codeLens") then
-      vim.lsp.codelens.refresh()
+      vim.lsp.codelens.refresh({ bufnr = 0 })
       vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
         buffer = buf,
-        callback = vim.lsp.codelens.refresh,
+        callback = function()
+          vim.lsp.codelens.refresh({ bufnr = 0 })
+        end,
       })
     end
   end,
@@ -88,6 +102,22 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -------------------------------------------------------------------------------
 -- Server configs (Neovim 0.12 built-in vim.lsp.config)
 -------------------------------------------------------------------------------
+
+-- Global defaults: capabilities sent to ALL servers
+vim.lsp.config("*", {
+  capabilities = {
+    textDocument = {
+      completion = {
+        completionItem = {
+          snippetSupport = true,
+          resolveSupport = {
+            properties = { "documentation", "detail", "additionalTextEdits" },
+          },
+        },
+      },
+    },
+  },
+})
 
 -- Lua
 vim.lsp.config("lua_ls", {
@@ -106,19 +136,19 @@ vim.lsp.config("lua_ls", {
         paramName = "Disable",
       },
     },
-  },
+  }, 
 })
 
 -- Expert (Elixir LSP)
 vim.lsp.config("expert", {
-  cmd = { os.getenv("HOME") .. "/.local/bin/expert_darwin_arm64" },
+  cmd = { os.getenv("HOME") .. "/.local/bin/expert_darwin_arm64", "--stdio" },
   filetypes = { "elixir", "eelixir", "heex" },
   root_markers = { "mix.exs", "mix.lock", ".git" },
   settings = {
-    expert = {
-      dialyzer = { enabled = true },
-      testLenses = { enabled = true },
-      suggestSpecs = { enabled = true },
+    elixir = {
+      dialyzerEnabled = true,
+      enableTestLenses = true,
+      suggestSpecs = true,
     },
   },
 })

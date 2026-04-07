@@ -43,6 +43,7 @@ vim.api.nvim_create_autocmd("User", {
   end,
 })
 
+-- Try nvim-treesitter configs API (may not exist on main branch)
 pcall(function()
   ---@diagnostic disable-next-line: missing-fields
   require("nvim-treesitter.configs").setup({
@@ -57,4 +58,12 @@ pcall(function()
     indent = { enable = true },
   })
 end)
+
+-- Fallback: ensure treesitter highlighting is always enabled via built-in API
+-- Neovim 0.12 can do this natively without the plugin
+vim.api.nvim_create_autocmd("FileType", {
+  callback = function()
+    pcall(vim.treesitter.start)
+  end,
+})
 
