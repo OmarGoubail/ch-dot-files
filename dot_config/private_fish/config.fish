@@ -1,5 +1,5 @@
 # Fix unknown terminal types on remote servers (e.g. ghostty over SSH)
-if not test -d /usr/share/terminfo/$TERM[1]; and not test -f /usr/share/terminfo/(string sub -l 1 $TERM)/$TERM
+if not infocmp -- $TERM &>/dev/null
     set -gx TERM xterm-256color
 end
 
@@ -8,6 +8,7 @@ set -l os_name (uname -s)
 
 # === PATH Setup (fish_add_path deduplicates automatically) ===
 fish_add_path $HOME/.local/bin
+fish_add_path $HOME/bin
 
 switch $os_name
     case Darwin
