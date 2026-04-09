@@ -14,7 +14,6 @@ sudo apt-get update
 sudo apt-get install -y \
     fish \
     tmux \
-    neovim \
     ripgrep \
     bat \
     btop \
@@ -44,6 +43,18 @@ fi
 if ! command -v tailscale &>/dev/null; then
     echo "==> Installing Tailscale..."
     curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+# --- Neovim (latest stable from GitHub releases) ---
+if ! command -v nvim &>/dev/null || [ "$(nvim --version | head -1 | grep -oP '\d+\.\d+')" != "0.11" ]; then
+    echo "==> Installing Neovim (latest stable)..."
+    ARCH=$(uname -m)
+    curl -Lo /tmp/nvim.tar.gz "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${ARCH}.tar.gz"
+    sudo rm -rf /opt/nvim
+    sudo tar xf /tmp/nvim.tar.gz -C /opt
+    sudo mv /opt/nvim-linux-${ARCH} /opt/nvim
+    sudo ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+    rm -f /tmp/nvim.tar.gz
 fi
 
 # --- Starship prompt ---
