@@ -7,6 +7,7 @@ local map = vim.keymap.set
 -------------------------------------------------------------------------------
 vim.pack.add({
   { src = "https://github.com/sindrets/diffview.nvim" },
+  { src = "https://github.com/NeogitOrg/neogit" },
   { src = "https://github.com/lewis6991/gitsigns.nvim" },
 })
 
@@ -43,27 +44,23 @@ pcall(function()
 end)
 
 -------------------------------------------------------------------------------
--- Lazygit (fullscreen terminal)
+-- Neogit (git client for staging/committing)
 -------------------------------------------------------------------------------
-map("n", "<leader>gg", function()
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    width = vim.o.columns,
-    height = vim.o.lines - 1,
-    row = 0,
-    col = 0,
-    style = "minimal",
-    border = "none",
+pcall(function()
+  require("neogit").setup({
+    integrations = {
+      diffview = true,
+    },
+    kind = "tab",
+    signs = {
+      section = { "▸", "▾" },
+      item = { "▸", "▾" },
+    },
   })
-  vim.fn.termopen("lazygit", {
-    on_exit = function()
-      pcall(vim.api.nvim_buf_delete, buf, { force = true })
-      vim.cmd("checktime") -- reload any files lazygit changed
-    end,
-  })
-  vim.cmd("startinsert")
-end, { desc = "Lazygit" })
+
+  map("n", "<leader>gg", "<cmd>Neogit<cr>", { desc = "Neogit" })
+  map("n", "<leader>gc", "<cmd>Neogit commit<cr>", { desc = "Neogit Commit" })
+end)
 
 -------------------------------------------------------------------------------
 -- Gitsigns (git gutter signs, hunk navigation/staging)
