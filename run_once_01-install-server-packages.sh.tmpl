@@ -1,0 +1,87 @@
+{{- if not (and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "ubuntu")) -}}
+#!/bin/sh
+exit 0
+{{- else -}}
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Installing server packages..."
+
+export DEBIAN_FRONTEND=noninteractive
+
+# --- apt packages ---
+sudo apt-get update
+sudo apt-get install -y \
+    fish \
+    tmux \
+    neovim \
+    ripgrep \
+    bat \
+    btop \
+    fzf \
+    jq \
+    curl \
+    wget \
+    git \
+    unzip \
+    make \
+    htop \
+    lsof \
+    ufw
+
+# bat is packaged as batcat on Ubuntu
+if command -v batcat &>/dev/null && ! command -v bat &>/dev/null; then
+    sudo ln -sf "$(which batcat)" /usr/local/bin/bat
+fi
+
+# --- Docker (official convenience script) ---
+if ! command -v docker &>/dev/null; then
+    echo "==> Installing Docker..."
+    curl -fsSL https://get.docker.com | sh
+fi
+
+# --- Tailscale (official installer) ---
+if ! command -v tailscale &>/dev/null; then
+    echo "==> Installing Tailscale..."
+    curl -fsSL https://tailscale.com/install.sh | sh
+fi
+
+# --- Starship prompt ---
+if ! command -v starship &>/dev/null; then
+    echo "==> Installing Starship..."
+    curl -sS https://starship.rs/install.sh | sh -s -- -y
+fi
+
+# --- eza (ls replacement) ---
+if ! command -v eza &>/dev/null; then
+    echo "==> Installing eza..."
+    sudo mkdir -p /etc/apt/keyrings
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg
+    echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" | sudo tee /etc/apt/sources.list.d/gierens.list
+    sudo apt-get update
+    sudo apt-get install -y eza
+fi
+
+# --- Lazygit ---
+if ! command -v lazygit &>/dev/null; then
+    echo "==> Installing Lazygit..."
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)  LAZYGIT_ARCH="x86_64" ;;
+        aarch64) LAZYGIT_ARCH="arm64" ;;
+    esac
+    curl -Lo /tmp/lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_${LAZYGIT_ARCH}.tar.gz"
+    tar xf /tmp/lazygit.tar.gz -C /tmp lazygit
+    sudo install /tmp/lazygit /usr/local/bin
+    rm -f /tmp/lazygit.tar.gz /tmp/lazygit
+fi
+
+# --- Lazydocker ---
+if ! command -v lazydocker &>/dev/null; then
+    echo "==> Installing Lazydocker..."
+    curl -fsSL https://raw.githubusercontent.com/jesseduffield/lazydocker/master/scripts/install_update_linux.sh | bash
+fi
+
+echo "==> Server packages installed."
+{{- end }}

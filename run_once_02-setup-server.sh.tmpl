@@ -1,0 +1,63 @@
+{{- if not (and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "ubuntu")) -}}
+#!/bin/sh
+exit 0
+{{- else -}}
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Configuring server..."
+
+# Set fish as default shell
+FISH_PATH=$(which fish)
+if [ "$SHELL" != "$FISH_PATH" ]; then
+    echo "==> Setting fish as default shell..."
+    if ! grep -q "$FISH_PATH" /etc/shells; then
+        echo "$FISH_PATH" | sudo tee -a /etc/shells
+    fi
+    sudo chsh -s "$FISH_PATH" "$(whoami)"
+fi
+
+# Enable and start Docker
+if command -v docker &>/dev/null; then
+    echo "==> Enabling Docker..."
+    sudo systemctl enable --now docker
+    # Add current user to docker group (if not root)
+    if [ "$(id -u)" -ne 0 ]; then
+        sudo usermod -aG docker "$(whoami)"
+    fi
+fi
+
+# Enable and start Tailscale
+if command -v tailscale &>/dev/null; then
+    echo "==> Enabling Tailscale..."
+    sudo systemctl enable --now tailscaled
+fi
+
+echo ""
+echo "=========================================="
+echo "  Server configured. Next steps:"
+echo "=========================================="
+echo ""
+echo "  1. Connect Tailscale:"
+echo "       sudo tailscale up --ssh"
+echo ""
+echo "     --ssh enables Tailscale SSH (no keys needed)"
+echo "     Follow the auth URL it prints."
+echo ""
+echo "  2. From your Mac, test the Tailscale connection:"
+echo "       ssh root@<tailscale-ip>"
+echo ""
+echo "  3. Lock down the server:"
+echo "       sudo secure-server lockdown"
+echo ""
+echo "  4. Share apps without a domain:"
+echo "       tailscale funnel 3000"
+echo "       (gives you a public https://*.ts.net URL)"
+echo ""
+echo "  5. When you have a domain + Cloudflare:"
+echo "       sudo secure-server cloudflare"
+echo ""
+echo "=========================================="
+
+echo "==> Server setup complete."
+{{- end }}

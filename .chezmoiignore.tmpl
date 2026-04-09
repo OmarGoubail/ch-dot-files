@@ -1,0 +1,32 @@
+.config/tmux/plugins/*
+**/*.backup
+**/*.bak
+**/.DS_Store
+
+{{- if eq .chezmoi.os "darwin" }}
+# macOS: skip server-only files
+.local/bin/secure-server
+{{- end }}
+
+{{- if and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "ubuntu") }}
+# Server: skip all desktop configs
+.config/aerospace
+.config/alacritty
+.config/ghostty
+.config/hypr
+.config/kitty
+.config/kmonad
+.config/mako
+.config/opencode
+.config/opensessions
+.config/swayosd
+.config/walker
+.config/waybar
+.config/wezterm
+.config/worktrunk
+.config/zed
+.config/zellij
+.config/graphite
+.config/atuin
+.config/uv
+{{- end }}
