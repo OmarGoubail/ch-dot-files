@@ -19,13 +19,26 @@ vim.pack.add({
 })
 
 -------------------------------------------------------------------------------
--- fff.nvim: build binary on install/update
+-- fff.nvim: build binary on install/update and first startup
 -------------------------------------------------------------------------------
 vim.api.nvim_create_autocmd("User", {
 	pattern = "PackChanged",
 	callback = function()
 		pcall(function()
 			require("fff.download").download_or_build_binary()
+		end)
+	end,
+})
+
+vim.api.nvim_create_autocmd("VimEnter", {
+	once = true,
+	callback = function()
+		pcall(function()
+			local ok, fff = pcall(require, "fff.native")
+			if not ok then
+				vim.notify("fff: binary not found, building...", vim.log.levels.INFO)
+				require("fff.download").download_or_build_binary()
+			end
 		end)
 	end,
 })
