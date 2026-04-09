@@ -1,131 +1,71 @@
 # Detect OS
 set -l os_name (uname -s)
-set -l arch_name (uname -m)
 
-# OS-specific configurations
+# === PATH Setup (fish_add_path deduplicates automatically) ===
+fish_add_path $HOME/.local/bin
+
 switch $os_name
-    case Darwin # macOS (M4 MacBook)
-        # Set up Homebrew for Apple Silicon
-        set -gx PATH /opt/homebrew/bin /opt/homebrew/sbin $PATH
+    case Darwin
         if test -f /opt/homebrew/bin/brew
             eval (/opt/homebrew/bin/brew shellenv)
         end
 
-        # Now Atuin will be found
-        if command -v atuin >/dev/null
-            atuin init fish | source
-
-        end
-
-        if command -v zoxide >/dev/null
-            zoxide init fish | source
-        end
-
-        # Java on macOS (if installed via Homebrew)
         if test -d /opt/homebrew/opt/openjdk
-            set -x JAVA_HOME /opt/homebrew/opt/openjdk
-            set -x PATH $JAVA_HOME/bin $PATH
+            set -gx JAVA_HOME /opt/homebrew/opt/openjdk
+            fish_add_path $JAVA_HOME/bin
         end
 
-        # Browser (use system default)
-        set -x BROWSER open
+        set -gx BROWSER open
 
-    case Linux # Arch Linux
-
-        if command -v zoxide >/dev/null
-            zoxide init fish | source
-        end
-
-        if command -v atuin >/dev/null
-            atuin init fish | source
-        end
-
-        # Java
+    case Linux
         if test -d /usr/lib/jvm/java-21-openjdk
-            set -x JAVA_HOME /usr/lib/jvm/java-21-openjdk
-            set -x PATH $JAVA_HOME/bin $PATH
+            set -gx JAVA_HOME /usr/lib/jvm/java-21-openjdk
+            fish_add_path $JAVA_HOME/bin
         end
 
-        # Browser
         if test -f /usr/bin/zen-browser
-            set -x BROWSER /usr/bin/zen-browser
+            set -gx BROWSER /usr/bin/zen-browser
         end
 
-        # Google Cloud SDK
         if test -f /home/$USER/stuff/dev/gcloud/google-cloud-sdk/path.fish.inc
             source /home/$USER/stuff/dev/gcloud/google-cloud-sdk/path.fish.inc
         end
 
-        # Z exclude paths
         set -gx Z_EXCLUDE /home/$USER/stuff/dev/gcloud /home/$USER/stuff/dev/gcloud/google-cloud-sdk
-end
-
-# Universal configurations (work on both systems)
-# Starship prompt
-if command -v starship >/dev/null
 end
 
 # Volta
 if test -d $HOME/.volta
     set -gx VOLTA_HOME $HOME/.volta
-    set -gx PATH $VOLTA_HOME/bin $PATH
+    fish_add_path $VOLTA_HOME/bin
 end
 
-# Fly.io CLI
+# Fly.io
 if test -d $HOME/.fly
     set -gx FLYCTL_INSTALL $HOME/.fly
-    set -gx PATH $FLYCTL_INSTALL/bin $PATH
+    fish_add_path $FLYCTL_INSTALL/bin
 end
 
 # Bun
 if test -d $HOME/.bun
-    set --export BUN_INSTALL $HOME/.bun
-    set --export PATH $BUN_INSTALL/bin $PATH
+    set -gx BUN_INSTALL $HOME/.bun
+    fish_add_path $BUN_INSTALL/bin
 end
 
-# Git abbreviations
+# === Abbreviations ===
 abbr --add to git switch
 abbr --add nb git checkout -b
 abbr --add jjd 'jj describe -m'
+abbr --add cld claude --dangerously-skip-permissions
 
-# ASDF configuration
-if test -z $ASDF_DATA_DIR
-    set _asdf_shims $HOME/.asdf/shims
-else
-    set _asdf_shims $ASDF_DATA_DIR/shims
-end
+# WorkTrunk
+abbr --add wts 'wt switch'
+abbr --add wtl 'wt list --full'
+abbr --add wtm 'wt merge'
+abbr --add wtr 'wt remove'
+abbr --add wta 'wt switch -x opencode -c'
+abbr --add wtpl 'wt step prune --dry-run'
 
-# Do not use fish_add_path (added in Fish 3.2) because it
-# potentially changes the order of items in PATH
-if not contains $_asdf_shims $PATH
-    set -gx --prepend PATH $_asdf_shims
-end
-set --erase _asdf_shims
-
-# Local bin directory (user-specific)
-if test -d $HOME/.local/bin
-    set -gx PATH $HOME/.local/bin $PATH
-end
-
-# Environment variables (keep these secret in production!)
-
-# bun
-set --export BUN_INSTALL "$HOME/.bun"
-set --export PATH $BUN_INSTALL/bin $PATH
-
-starship init fish | source
-
-abbr cld claude --dangerously-skip-permissions
-
-# WorkTrunk aliases
-abbr wts 'wt switch'
-abbr wtl 'wt list --full'
-abbr wtm 'wt merge'
-abbr wtr 'wt remove'
-abbr wta 'wt switch -x opencode -c'
-abbr wtpl 'wt step prune --dry-run'
-
-# WorkTrunk function: create worktree with cache copy
 function wtc
     if test (count $argv) -eq 0
         echo "Usage: wtc <branch-name>"
@@ -134,9 +74,31 @@ function wtc
     wt switch --create $argv[1] && wt step copy-ignored
 end
 
-# /home/omargoubail/.local/bin/mise activate fish | source # added by https://mise.run/fish
-if status is-interactive
-    mise activate fish | source
-else
-    mise activate fish --shims | source
+# === Tool Init (cached for fast startup) ===
+# Run `fish_cache_regen` after updating these tools
+set -l _cache $HOME/.cache/fish-init
+test -d $_cache; or mkdir -p $_cache
+
+if command -v starship >/dev/null
+    test -f $_cache/starship.fish; or starship init fish --print-full-init >$_cache/starship.fish
+    source $_cache/starship.fish
+end
+
+if command -v atuin >/dev/null
+    test -f $_cache/atuin.fish; or atuin init fish >$_cache/atuin.fish
+    source $_cache/atuin.fish
+end
+
+if command -v zoxide >/dev/null
+    test -f $_cache/zoxide.fish; or zoxide init fish >$_cache/zoxide.fish
+    source $_cache/zoxide.fish
+end
+
+if command -v mise >/dev/null
+    if status is-interactive
+        test -f $_cache/mise.fish; or mise activate fish >$_cache/mise.fish
+        source $_cache/mise.fish
+    else
+        mise activate fish --shims | source
+    end
 end
