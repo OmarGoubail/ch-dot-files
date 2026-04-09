@@ -82,7 +82,12 @@ harden_ssh() {
         echo "PermitRootLogin no" >> "$SSHD_CONFIG"
     fi
 
-    systemctl restart sshd
+    # Ubuntu uses 'ssh', others use 'sshd'
+    if systemctl list-units --type=service | grep -q "ssh.service"; then
+        systemctl restart ssh
+    else
+        systemctl restart sshd
+    fi
 }
 
 # ==============================================================================

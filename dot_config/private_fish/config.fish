@@ -1,3 +1,8 @@
+# Fix unknown terminal types on remote servers (e.g. ghostty over SSH)
+if not test -d /usr/share/terminfo/$TERM[1]; and not test -f /usr/share/terminfo/(string sub -l 1 $TERM)/$TERM
+    set -gx TERM xterm-256color
+end
+
 # Detect OS
 set -l os_name (uname -s)
 
