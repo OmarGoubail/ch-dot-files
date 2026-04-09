@@ -15,14 +15,38 @@ pcall(function()
     ui = { border = "single" },
   })
   -- Add mason bin to PATH so vim.lsp.config can find installed servers
-  -- Check both nvim-exp and shared nvim mason directories
   local mason_bin = vim.fn.stdpath("data") .. "/mason/bin"
-  local shared_mason_bin = vim.fn.expand("~/.local/share/nvim/mason/bin")
-  for _, bin_dir in ipairs({ mason_bin, shared_mason_bin }) do
-    if not vim.env.PATH:find(bin_dir, 1, true) then
-      vim.env.PATH = bin_dir .. ":" .. vim.env.PATH
-    end
+  if not vim.env.PATH:find(mason_bin, 1, true) then
+    vim.env.PATH = mason_bin .. ":" .. vim.env.PATH
   end
+
+  -- Auto-install missing mason packages on startup
+  local ensure_installed = {
+    "lua-language-server",
+    "typescript-language-server",
+    "tailwindcss-language-server",
+    "emmet-ls",
+    "vscode-json-language-server",
+    "rust-analyzer",
+    "stylua",
+    "prettier",
+    "shfmt",
+  }
+
+  local registry = require("mason-registry")
+  registry.refresh(function()
+    local to_install = {}
+    for _, name in ipairs(ensure_installed) do
+      local ok, pkg = pcall(registry.get_package, name)
+      if ok and not pkg:is_installed() then
+        table.insert(to_install, pkg)
+      end
+    end
+    for _, pkg in ipairs(to_install) do
+      vim.notify("Mason: installing " .. pkg.name)
+      pkg:install()
+    end
+  end)
 end)
 
 -------------------------------------------------------------------------------
@@ -88,13 +112,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     -- Enable codelens if supported
     if client:supports_method("textDocument/codeLens") then
-      vim.lsp.codelens.refresh({ bufnr = 0 })
-      vim.api.nvim_create_autocmd({ "BufEnter", "InsertLeave" }, {
-        buffer = buf,
-        callback = function()
-          vim.lsp.codelens.refresh({ bufnr = 0 })
-        end,
-      })
+      vim.lsp.codelens.enable(true, { bufnr = buf })
     end
   end,
 })

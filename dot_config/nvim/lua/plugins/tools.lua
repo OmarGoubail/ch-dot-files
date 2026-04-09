@@ -35,6 +35,12 @@ end)
 -------------------------------------------------------------------------------
 -- Treesitter
 -------------------------------------------------------------------------------
+-- nvim-treesitter stores queries in runtime/ subdir - add it to rtp
+local ts_path = vim.fn.stdpath("data") .. "/site/pack/core/opt/nvim-treesitter/runtime"
+if vim.uv.fs_stat(ts_path) and not vim.o.runtimepath:find(ts_path, 1, true) then
+  vim.opt.runtimepath:prepend(ts_path)
+end
+
 -- Run :TSUpdate after install/update
 vim.api.nvim_create_autocmd("User", {
   pattern = "PackChanged",
@@ -43,24 +49,34 @@ vim.api.nvim_create_autocmd("User", {
   end,
 })
 
--- Try nvim-treesitter configs API (may not exist on main branch)
-pcall(function()
-  ---@diagnostic disable-next-line: missing-fields
-  require("nvim-treesitter.configs").setup({
-    ensure_installed = {
-      "bash", "c", "css", "diff", "elixir", "eex", "heex",
-      "fish", "html", "javascript", "json", "jsonc", "lua",
-      "luadoc", "markdown", "markdown_inline", "query", "regex",
-      "rust", "svelte", "astro", "toml", "tsx", "typescript",
-      "vim", "vimdoc", "xml", "yaml",
-    },
-    highlight = { enable = true },
-    indent = { enable = true },
-  })
-end)
+-- Parsers to auto-install
+local ensure_installed = {
+  "bash", "c", "css", "diff", "elixir", "eex", "heex",
+  "fish", "html", "javascript", "json", "jsonc", "lua",
+  "luadoc", "markdown", "markdown_inline", "query", "regex",
+  "rust", "svelte", "astro", "toml", "tsx", "typescript",
+  "vim", "vimdoc", "xml", "yaml",
+}
 
--- Fallback: ensure treesitter highlighting is always enabled via built-in API
--- Neovim 0.12 can do this natively without the plugin
+-- Auto-install missing parsers on startup
+vim.api.nvim_create_autocmd("VimEnter", {
+  once = true,
+  callback = function()
+    local missing = {}
+    for _, lang in ipairs(ensure_installed) do
+      local ok = pcall(vim.treesitter.language.inspect, lang)
+      if not ok then
+        table.insert(missing, lang)
+      end
+    end
+    if #missing > 0 then
+      vim.notify("Installing treesitter parsers: " .. table.concat(missing, ", "))
+      vim.cmd("TSInstall " .. table.concat(missing, " "))
+    end
+  end,
+})
+
+-- Enable treesitter highlighting via built-in API
 vim.api.nvim_create_autocmd("FileType", {
   callback = function()
     pcall(vim.treesitter.start)
