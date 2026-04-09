@@ -64,6 +64,12 @@ if ! command -v cargo &>/dev/null; then
     source "$HOME/.cargo/env"
 fi
 
+# --- Atuin (shell history) ---
+if ! command -v atuin &>/dev/null; then
+    echo "==> Installing Atuin..."
+    curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+fi
+
 # --- Starship prompt ---
 if ! command -v starship &>/dev/null; then
     echo "==> Installing Starship..."
