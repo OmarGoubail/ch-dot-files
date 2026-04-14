@@ -47,14 +47,7 @@ pcall(function()
       end,
       diagnostics = "nvim_lsp",
       always_show_bufferline = false,
-      offsets = {
-        {
-          filetype = "neo-tree",
-          text = "Neo-tree",
-          highlight = "Directory",
-          text_align = "left",
-        },
-      },
+      offsets = {},
     },
   })
 end)
@@ -71,6 +64,7 @@ pcall(function()
     scope = { enabled = true },
     words = { enabled = true },
     terminal = { enabled = true },
+    zen = { enabled = true },
     scroll = { enabled = false },
     dashboard = { enabled = false },
     statuscolumn = { enabled = false },

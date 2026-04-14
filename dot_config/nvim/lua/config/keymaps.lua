@@ -185,6 +185,10 @@ map("n", "<leader>uh", function()
   vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled())
 end, { desc = "Toggle Inlay Hints" })
 
+map("n", "<leader>uz", function()
+  Snacks.zen()
+end, { desc = "Toggle Zen Mode" })
+
 -------------------------------------------------------------------------------
 -- Inspect
 -------------------------------------------------------------------------------

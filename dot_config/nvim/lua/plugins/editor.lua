@@ -7,8 +7,7 @@ local map = vim.keymap.set
 -------------------------------------------------------------------------------
 vim.pack.add({
 	{ src = "https://github.com/nvim-lua/plenary.nvim" },
-	{ src = "https://github.com/MunifTanjim/nui.nvim" },
-	{ src = "https://github.com/nvim-neo-tree/neo-tree.nvim" },
+	{ src = "https://github.com/stevearc/oil.nvim" },
 	{ src = "https://github.com/dmtrKovalenko/fff.nvim" },
 	{ src = "https://github.com/folke/flash.nvim" },
 	{ src = "https://github.com/ThePrimeagen/harpoon", version = "harpoon2" },
@@ -34,53 +33,35 @@ vim.api.nvim_create_autocmd("VimEnter", {
 	once = true,
 	callback = function()
 		pcall(function()
-			local ok, fff = pcall(require, "fff.native")
-			if not ok then
-				vim.notify("fff: binary not found, building...", vim.log.levels.INFO)
-				require("fff.download").download_or_build_binary()
+			-- Try loading the native module directly
+			if pcall(require, "fff.native") then
+				return
 			end
+			-- Fallback: check if binary file exists on disk (require can fail
+			-- due to cpath timing even when the .so/.dylib is present)
+			local found = vim.fn.globpath(vim.o.runtimepath, "lua/fff/native.*")
+			if found ~= "" then
+				return
+			end
+			vim.notify("fff: binary not found, building...", vim.log.levels.INFO)
+			require("fff.download").download_or_build_binary()
 		end)
 	end,
 })
 
 -------------------------------------------------------------------------------
--- Neo-tree
+-- Oil.nvim (file explorer)
 -------------------------------------------------------------------------------
 pcall(function()
-	require("neo-tree").setup({
-		sources = { "filesystem", "buffers", "git_status" },
-		filesystem = {
-			follow_current_file = { enabled = true },
-			use_libuv_file_watcher = true,
-			filtered_items = {
-				hide_dotfiles = false,
-				hide_gitignored = false,
-			},
-		},
-		window = {
-			position = "left",
-			width = 30,
-			mappings = {
-				["<space>"] = "none",
-				-- Pass through to smart-splits instead of neo-tree handling these
-				["<C-h>"] = "none",
-				["<C-j>"] = "none",
-				["<C-k>"] = "none",
-				["<C-l>"] = "none",
-			},
-		},
-		default_component_configs = {
-			indent = {
-				with_expanders = true,
-				expander_collapsed = "▸",
-				expander_expanded = "▾",
-			},
+	require("oil").setup({
+		default_file_explorer = true,
+		view_options = {
+			show_hidden = true,
 		},
 	})
-	map("n", "<leader>e", "<cmd>Neotree toggle<cr>", { desc = "Explorer" })
-	map("n", "<leader>fe", "<cmd>Neotree toggle<cr>", { desc = "Explorer" })
-	map("n", "<leader>ge", "<cmd>Neotree git_status<cr>", { desc = "Git Explorer" })
-	map("n", "<leader>be", "<cmd>Neotree buffers<cr>", { desc = "Buffer Explorer" })
+	map("n", "-", "<cmd>Oil<cr>", { desc = "Open parent directory" })
+	map("n", "<leader>e", "<cmd>Oil<cr>", { desc = "Explorer (Oil)" })
+	map("n", "<leader>fe", "<cmd>Oil<cr>", { desc = "Explorer (Oil)" })
 end)
 
 -------------------------------------------------------------------------------
