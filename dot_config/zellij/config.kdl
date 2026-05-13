@@ -9,6 +9,32 @@ keybinds clear-defaults=true {
     // Pass-through mode. The only global Zellij key is the leader.
     locked {
         bind "Ctrl a" { SwitchToMode "Tmux"; }
+
+        // Smart split navigation across Neovim and Zellij panes.
+        bind "Ctrl h" {
+            MessagePlugin "file:~/.config/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "left"
+            }
+        }
+        bind "Ctrl j" {
+            MessagePlugin "file:~/.config/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "down"
+            }
+        }
+        bind "Ctrl k" {
+            MessagePlugin "file:~/.config/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "up"
+            }
+        }
+        bind "Ctrl l" {
+            MessagePlugin "file:~/.config/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "right"
+            }
+        }
     }
 
     // Custom tmux-style leader table: press Ctrl-a, then one of these keys.
@@ -66,7 +92,8 @@ keybinds clear-defaults=true {
                 move_to_focused_tab true
                 "LOAD_ZELLIJ_BINDINGS" "false"
 
-                "Ctrl-a h/j/k/l" "move pane focus"
+                "Ctrl-h/j/k/l" "smart move across Neovim/Zellij panes"
+                "Ctrl-a h/j/k/l" "move Zellij pane focus"
                 "Ctrl-a |" "split right"
                 "Ctrl-a -" "split down"
                 "Ctrl-a x" "close focused pane"
