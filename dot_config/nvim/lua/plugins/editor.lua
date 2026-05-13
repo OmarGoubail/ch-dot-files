@@ -33,18 +33,16 @@ vim.api.nvim_create_autocmd("VimEnter", {
 	once = true,
 	callback = function()
 		pcall(function()
-			-- Try loading the native module directly
-			if pcall(require, "fff.native") then
-				return
-			end
-			-- Fallback: check if binary file exists on disk (require can fail
-			-- due to cpath timing even when the .so/.dylib is present)
-			local found = vim.fn.globpath(vim.o.runtimepath, "lua/fff/native.*")
-			if found ~= "" then
-				return
-			end
-			vim.notify("fff: binary not found, building...", vim.log.levels.INFO)
-			require("fff.download").download_or_build_binary()
+			-- ensure_downloaded checks if the binary exists on disk and only
+			-- downloads when it's actually missing (unlike download_or_build_binary
+			-- which always forces a re-download)
+			require("fff.download").ensure_downloaded({}, function(success, err)
+				if not success then
+					vim.schedule(function()
+						vim.notify("fff: " .. (err or "failed to ensure binary"), vim.log.levels.ERROR)
+					end)
+				end
+			end)
 		end)
 	end,
 })
@@ -57,6 +55,13 @@ pcall(function()
 		default_file_explorer = true,
 		view_options = {
 			show_hidden = true,
+		},
+		keymaps = {
+			-- Disable defaults that conflict with smart-splits
+			["<C-h>"] = false,
+			["<C-j>"] = false,
+			["<C-k>"] = false,
+			["<C-l>"] = false,
 		},
 	})
 	map("n", "-", "<cmd>Oil<cr>", { desc = "Open parent directory" })

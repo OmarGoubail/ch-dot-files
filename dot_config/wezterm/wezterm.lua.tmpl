@@ -79,6 +79,59 @@ config.keys = {
 		action = act.TogglePaneZoomState,
 	},
 
+	-- Zoom-aware pane cycling: switch between panes while staying zoomed
+	-- Leader+Tab = next pane, Leader+Shift+Tab = previous pane
+	{
+		key = "Tab",
+		mods = "LEADER",
+		action = wezterm.action_callback(function(win, pane)
+			local tab = win:active_tab()
+			local panes = tab:panes_with_info()
+			local current_idx = 0
+			local is_zoomed = false
+			for i, p in ipairs(panes) do
+				if p.is_active then
+					current_idx = i
+					is_zoomed = p.is_zoomed
+					break
+				end
+			end
+			local next_idx = (current_idx % #panes)  -- 0-indexed, wraps around
+			if is_zoomed then
+				win:perform_action(act.TogglePaneZoomState, pane)
+			end
+			win:perform_action(act.ActivatePaneByIndex(next_idx), pane)
+			if is_zoomed then
+				win:perform_action(act.TogglePaneZoomState, win:active_pane())
+			end
+		end),
+	},
+	{
+		key = "Tab",
+		mods = "LEADER|SHIFT",
+		action = wezterm.action_callback(function(win, pane)
+			local tab = win:active_tab()
+			local panes = tab:panes_with_info()
+			local current_idx = 0
+			local is_zoomed = false
+			for i, p in ipairs(panes) do
+				if p.is_active then
+					current_idx = i
+					is_zoomed = p.is_zoomed
+					break
+				end
+			end
+			local prev_idx = ((current_idx - 2) % #panes)  -- 0-indexed, wraps around
+			if is_zoomed then
+				win:perform_action(act.TogglePaneZoomState, pane)
+			end
+			win:perform_action(act.ActivatePaneByIndex(prev_idx), pane)
+			if is_zoomed then
+				win:perform_action(act.TogglePaneZoomState, win:active_pane())
+			end
+		end),
+	},
+
 	-- Close pane
 	{
 		key = "x",
@@ -282,6 +335,61 @@ table.insert(config.keys, {
 	key = "d",
 	mods = "CTRL|ALT",
 	action = act.ScrollByPage(0.5),
+})
+
+-- ==============================================
+-- FAST PANE CYCLING (zoom-aware, single chord)
+-- ==============================================
+
+-- Ctrl+Tab = next pane (stays zoomed), Ctrl+Shift+Tab = previous
+table.insert(config.keys, {
+	key = "Tab",
+	mods = "CTRL",
+	action = wezterm.action_callback(function(win, pane)
+		local tab = win:active_tab()
+		local panes = tab:panes_with_info()
+		local current_idx = 0
+		local is_zoomed = false
+		for i, p in ipairs(panes) do
+			if p.is_active then
+				current_idx = i
+				is_zoomed = p.is_zoomed
+				break
+			end
+		end
+		if is_zoomed then
+			win:perform_action(act.TogglePaneZoomState, pane)
+		end
+		win:perform_action(act.ActivatePaneByIndex(current_idx % #panes), pane)
+		if is_zoomed then
+			win:perform_action(act.TogglePaneZoomState, win:active_pane())
+		end
+	end),
+})
+
+table.insert(config.keys, {
+	key = "Tab",
+	mods = "CTRL|SHIFT",
+	action = wezterm.action_callback(function(win, pane)
+		local tab = win:active_tab()
+		local panes = tab:panes_with_info()
+		local current_idx = 0
+		local is_zoomed = false
+		for i, p in ipairs(panes) do
+			if p.is_active then
+				current_idx = i
+				is_zoomed = p.is_zoomed
+				break
+			end
+		end
+		if is_zoomed then
+			win:perform_action(act.TogglePaneZoomState, pane)
+		end
+		win:perform_action(act.ActivatePaneByIndex(((current_idx - 2) % #panes)), pane)
+		if is_zoomed then
+			win:perform_action(act.TogglePaneZoomState, win:active_pane())
+		end
+	end),
 })
 
 -- ==============================================
