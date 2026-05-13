@@ -1,152 +1,101 @@
-keybinds {
-    normal clear-defaults=true {
+// Zellij should be invisible until explicitly summoned.
+default_mode "locked"
 
-        // tmux
+// Keep the tab bar, but remove the bottom status/keybind bar.
+default_layout "disable-status-bar"
+
+// Start from zero so default Ctrl/Alt bindings do not collide with shells, Neovim, or Aerospace.
+keybinds clear-defaults=true {
+    // Pass-through mode. The only global Zellij key is the leader.
+    locked {
         bind "Ctrl a" { SwitchToMode "Tmux"; }
-        unbind "Ctrl b"
-   // general stuff
-        // bind "Alt Left" { NewPane "Left"; }
-        // bind "Alt Right" { NewPane "Right"; }
-        // bind "Alt Up" { NewPane "Up"; }
-        // bind "Alt Down" { NewPane "Up"; }
-        // bind "Alt x" { CloseFocus; SwitchToMode "Normal"; }
-        // bind "Alt w" { ToggleFloatingPanes;}
-        // bind "Alt t" { NewTab;}
-        // bind "Alt h" { MoveFocusOrTab "Left"; }
-        // bind "Alt l" { MoveFocusOrTab "Right"; }
-        // bind "Alt j" { MoveFocus "Down"; }
-        // bind "Alt k" { MoveFocus "Up"; }
-        // bind "Alt =" { Resize "Increase"; }
-        // bind "Alt -" { Resize "Decrease"; }
-        // bind "Alt [" { PreviousSwapLayout; }
-        // bind "Alt ]" { NextSwapLayout; }
-        // bind "Alt i" { MoveTab "Left"; }
-        // bind "Alt o" { MoveTab "Right"; }
-    }
-  tmux clear-defaults=true {
-        bind "Ctrl f" { Write 2; SwitchToMode "Normal"; }
-        bind "Esc" { SwitchToMode "Normal"; }
-        bind "g" { SwitchToMode "Locked"; }
-        bind "p" { SwitchToMode "Pane"; }
-        bind "t" { SwitchToMode "Tab"; }
-        bind "n" { SwitchToMode "Resize"; }
-        bind "h" { SwitchToMode "Move"; }
-        bind "s" { SwitchToMode "Scroll"; }
-        bind "o" { SwitchToMode "Session"; }
-        bind "Shift q" { Quit; }
-
-        bind "Left" { NewPane "Left"; }
-        bind "Right" { NewPane "Right"; }
-        bind "Up" { NewPane "Up"; }
-        bind "Down" { NewPane "Down"; }
-        bind "x" { CloseFocus; SwitchToMode "Normal"; }
-        bind "w" { ToggleFloatingPanes; SwitchToMode "Normal"; }
-        // bind "t" { NewTab; SwitchToMode "Normal"; }
-        bind "h" { MoveFocusOrTab "Left"; }
-        bind "l" { MoveFocusOrTab "Right"; }
-        bind "j" { MoveFocus "Down"; }
-        bind "k" { MoveFocus "Up"; }
-        bind "=" { Resize "Increase"; }
-        bind "-" { Resize "Decrease"; }
-        bind "[" { PreviousSwapLayout; SwitchToMode "Normal"; }
-        bind "]" { NextSwapLayout; SwitchToMode "Normal"; }
-        // bind "i" { MoveTab "Left"; SwitchToMode "Normal"; }
-        // bind "o" { MoveTab "Right"; SwitchToMode "Normal"; }
-
-        bind "Shift Left" { MoveTab "Left"; }
-        bind "Shift h" { MoveTab "Left"; }
-        bind "Shift Right" { MoveTab "Right"; }
-        bind "Shift l" { MoveTab "Right"; }
     }
 
-   locked clear-defaults=true {
-        bind "Ctrl g" { SwitchToMode "Normal"; }
-        bind "Ctrl a" "g" { SwitchToMode "Normal"; }
+    // Custom tmux-style leader table: press Ctrl-a, then one of these keys.
+    tmux {
+        // Escape hatch / literal Ctrl-a for shell apps.
+        bind "Esc" { SwitchToMode "Locked"; }
+        bind "Ctrl a" { Write 1; SwitchToMode "Locked"; }
+
+        // Pane focus: tmux-ish outside Neovim; smart-splits can handle Ctrl-h/j/k/l inside Neovim.
+        bind "h" { MoveFocus "Left"; SwitchToMode "Locked"; }
+        bind "j" { MoveFocus "Down"; SwitchToMode "Locked"; }
+        bind "k" { MoveFocus "Up"; SwitchToMode "Locked"; }
+        bind "l" { MoveFocus "Right"; SwitchToMode "Locked"; }
+
+        // Pane creation and management.
+        bind "|" { NewPane "Right"; SwitchToMode "Locked"; }
+        bind "-" { NewPane "Down"; SwitchToMode "Locked"; }
+        bind "x" { CloseFocus; SwitchToMode "Locked"; }
+        bind "z" { ToggleFocusFullscreen; SwitchToMode "Locked"; }
+
+        // Floating/popup panes.
+        // ToggleFloatingPanes creates one if none exist; otherwise shows/hides them.
+        bind "f" { ToggleFloatingPanes; SwitchToMode "Locked"; }
+        // Float the current tiled pane, or embed the current floating pane back into the layout.
+        bind "e" { TogglePaneEmbedOrFloating; SwitchToMode "Locked"; }
+
+        // Tabs.
+        bind "c" { NewTab; SwitchToMode "Locked"; }
+        bind "n" { GoToNextTab; SwitchToMode "Locked"; }
+        bind "p" { GoToPreviousTab; SwitchToMode "Locked"; }
+        bind "Tab" { ToggleTab; SwitchToMode "Locked"; }
+        bind "1" { GoToTab 1; SwitchToMode "Locked"; }
+        bind "2" { GoToTab 2; SwitchToMode "Locked"; }
+        bind "3" { GoToTab 3; SwitchToMode "Locked"; }
+        bind "4" { GoToTab 4; SwitchToMode "Locked"; }
+        bind "5" { GoToTab 5; SwitchToMode "Locked"; }
+        bind "6" { GoToTab 6; SwitchToMode "Locked"; }
+        bind "7" { GoToTab 7; SwitchToMode "Locked"; }
+        bind "8" { GoToTab 8; SwitchToMode "Locked"; }
+        bind "9" { GoToTab 9; SwitchToMode "Locked"; }
+
+        // Sessions and built-in pickers.
+        bind "s" {
+            LaunchOrFocusPlugin "session-manager" {
+                floating true
+                move_to_focused_tab true
+            }
+            SwitchToMode "Locked";
+        }
+
+        // AGENTS: if you add, remove, or change any keybind in this file, keep this help popup 100% up to date.
+        bind "?" {
+            LaunchOrFocusPlugin "file:~/.config/zellij/plugins/zellij_forgot.wasm" {
+                floating true
+                move_to_focused_tab true
+                "LOAD_ZELLIJ_BINDINGS" "false"
+
+                "Ctrl-a h/j/k/l" "move pane focus"
+                "Ctrl-a |" "split right"
+                "Ctrl-a -" "split down"
+                "Ctrl-a x" "close focused pane"
+                "Ctrl-a z" "toggle focused pane fullscreen"
+                "Ctrl-a f" "toggle floating/popup panes"
+                "Ctrl-a e" "float/embed current pane"
+                "Ctrl-a c" "new tab"
+                "Ctrl-a n/p" "next/previous tab"
+                "Ctrl-a Tab" "toggle last tab"
+                "Ctrl-a 1..9" "go to tab number"
+                "Ctrl-a s" "session manager"
+                "Ctrl-a [" "scrollback"
+                "Ctrl-a Ctrl-a" "send literal Ctrl-a"
+                "Esc" "leave leader/scroll mode"
+            }
+            SwitchToMode "Locked";
+        }
+
+        // Scrollback.
+        bind "[" { SwitchToMode "Scroll"; }
     }
-}
 
-
-keybinds {
-    shared_except "locked" {
-        bind "Ctrl h" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "move_focus_or_tab";
-                payload "left";
-
-                // Plugin Configuration
-                move_mod "ctrl"; // Optional, should be added on every move command if changed.
-                use_arrow_keys "false"; // Optional, uses arrow keys instead of hjkl. Should be added to every command where you want to use it.
-            };
-        }
-
-        bind "Ctrl j" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "move_focus";
-                payload "down";
-
-                move_mod "ctrl";
-                use_arrow_keys "false";
-            };
-        }
-
-        bind "Ctrl k" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "move_focus";
-                payload "up";
-
-                move_mod "ctrl";
-                use_arrow_keys "false";
-            };
-        }
-
-        bind "Ctrl l" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "move_focus_or_tab";
-                payload "right";
-
-                move_mod "ctrl"; // Optional, should be added on every command if you want to use it
-                use_arrow_keys "false";
-            };
-        }
-
-        bind "Alt h" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "resize";
-                payload "left";
-
-                resize_mod "alt"; 
-            };
-        }
-
-        bind "Alt j" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "resize";
-                payload "down";
-
-                resize_mod "alt";
-            };
-        }
-
-        bind "Alt k" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "resize";
-                payload "up";
-
-                resize_mod "alt";
-            };
-        }
-
-        bind "Alt l" {
-            MessagePlugin "https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm" {
-                name "resize";
-                payload "right";
-
-                resize_mod "alt";
-            };
-        }
+    scroll {
+        bind "Esc" "q" { SwitchToMode "Locked"; }
+        bind "j" "Down" { ScrollDown; }
+        bind "k" "Up" { ScrollUp; }
+        bind "Ctrl f" "PageDown" "l" "Right" { PageScrollDown; }
+        bind "Ctrl b" "PageUp" "h" "Left" { PageScrollUp; }
+        bind "d" { HalfPageScrollDown; }
+        bind "u" { HalfPageScrollUp; }
     }
 }
-
-
-pane_frames false
-theme "catppuccin-mocha"
