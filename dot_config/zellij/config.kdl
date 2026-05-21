@@ -54,6 +54,7 @@ keybinds clear-defaults=true {
         bind "-" { NewPane "Down"; SwitchToMode "Locked"; }
         bind "x" { CloseFocus; SwitchToMode "Locked"; }
         bind "z" { ToggleFocusFullscreen; SwitchToMode "Locked"; }
+        bind "r" { SwitchToMode "Resize"; }
 
         // Floating/popup panes.
         // ToggleFloatingPanes creates one if none exist; otherwise shows/hides them.
@@ -66,6 +67,7 @@ keybinds clear-defaults=true {
         bind "n" { GoToNextTab; SwitchToMode "Locked"; }
         bind "p" { GoToPreviousTab; SwitchToMode "Locked"; }
         bind "Tab" { ToggleTab; SwitchToMode "Locked"; }
+        bind "," { SwitchToMode "RenameTab"; }
         bind "1" { GoToTab 1; SwitchToMode "Locked"; }
         bind "2" { GoToTab 2; SwitchToMode "Locked"; }
         bind "3" { GoToTab 3; SwitchToMode "Locked"; }
@@ -98,11 +100,13 @@ keybinds clear-defaults=true {
                 "Ctrl-a -" "split down"
                 "Ctrl-a x" "close focused pane"
                 "Ctrl-a z" "toggle focused pane fullscreen"
+                "Ctrl-a r h/j/k/l" "resize pane left/down/up/right"
                 "Ctrl-a f" "toggle floating/popup panes"
                 "Ctrl-a e" "float/embed current pane"
                 "Ctrl-a c" "new tab"
                 "Ctrl-a n/p" "next/previous tab"
                 "Ctrl-a Tab" "toggle last tab"
+                "Ctrl-a ," "rename current tab"
                 "Ctrl-a 1..9" "go to tab number"
                 "Ctrl-a s" "session manager"
                 "Ctrl-a [" "scrollback"
@@ -114,6 +118,19 @@ keybinds clear-defaults=true {
 
         // Scrollback.
         bind "[" { SwitchToMode "Scroll"; }
+    }
+
+    renametab {
+        bind "Enter" { SwitchToMode "Locked"; }
+        bind "Esc" "Ctrl c" { UndoRenameTab; SwitchToMode "Locked"; }
+    }
+
+    resize {
+        bind "Esc" "q" { SwitchToMode "Locked"; }
+        bind "h" "Left" { Resize "Left"; }
+        bind "j" "Down" { Resize "Down"; }
+        bind "k" "Up" { Resize "Up"; }
+        bind "l" "Right" { Resize "Right"; }
     }
 
     scroll {
