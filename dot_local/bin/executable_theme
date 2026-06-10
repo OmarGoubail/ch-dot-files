@@ -1,0 +1,834 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+theme_dir="$config_home/theme"
+profile_file="$theme_dir/profile"
+mode_file="$theme_dir/mode"
+ghostty_config="$theme_dir/ghostty.conf"
+nvim_config="$theme_dir/nvim.lua"
+herdr_theme_file="$theme_dir/herdr"
+herdr_config="$config_home/herdr/config.toml"
+pi_settings="$HOME/.pi/agent/settings.json"
+pi_theme_dir="$HOME/.pi/agent/themes"
+pi_theme_name="theme-current"
+pi_theme_file="$pi_theme_dir/$pi_theme_name.json"
+default_profile="tokyo"
+default_mode="dark"
+
+usage() {
+  cat <<'EOF'
+Usage: theme <command> [args]
+
+Commands:
+  list              List theme profiles with ANSI swatches and app mappings
+  pick              Pick a profile with fzf and preview swatches/mappings
+  use <profile>     Persist profile and regenerate runtime theme files
+  light             Persist light mode and regenerate runtime theme files
+  dark              Persist dark mode and regenerate runtime theme files
+  toggle            Toggle light/dark mode and regenerate runtime theme files
+  status            Print current profile, mode, and app mappings
+  delta [args...]   Exec delta with --light or --dark for the current theme
+
+Applies runtime files for Ghostty, Herdr, Neovim, Pi, and lazygit/delta.
+EOF
+}
+
+profiles() {
+  cat <<'EOF'
+tokyo
+catppuccin
+rose-pine
+kanagawa
+gruvbox
+one
+solarized
+dracula
+nord
+vesper
+EOF
+}
+
+profile_is_valid() {
+  case "${1:-}" in
+    tokyo|catppuccin|rose-pine|kanagawa|gruvbox|one|solarized|dracula|nord|vesper) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+profile_label() {
+  case "$1" in
+    tokyo) printf 'TokyoNight' ;;
+    catppuccin) printf 'Catppuccin' ;;
+    rose-pine) printf 'Rose Pine' ;;
+    kanagawa) printf 'Kanagawa' ;;
+    gruvbox) printf 'Gruvbox' ;;
+    one) printf 'Atom One' ;;
+    solarized) printf 'Solarized' ;;
+    dracula) printf 'Dracula' ;;
+    nord) printf 'Nord' ;;
+    vesper) printf 'Vesper' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+has_light_variant() {
+  case "$1" in
+    dracula|vesper) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+current_profile() {
+  if [[ -r "$profile_file" ]]; then
+    local profile
+    profile="$(<"$profile_file")"
+    profile="${profile%%[[:space:]]*}"
+    if profile_is_valid "$profile"; then
+      printf '%s\n' "$profile"
+      return
+    fi
+  fi
+
+  printf '%s\n' "$default_profile"
+}
+
+current_mode() {
+  if [[ -r "$mode_file" ]]; then
+    local mode
+    mode="$(<"$mode_file")"
+    mode="${mode%%[[:space:]]*}"
+    case "$mode" in
+      light|dark) printf '%s\n' "$mode"; return ;;
+    esac
+  fi
+
+  printf '%s\n' "$default_mode"
+}
+
+effective_mode() {
+  local profile="$1"
+  local mode="$2"
+
+  if [[ "$mode" == "light" ]] && ! has_light_variant "$profile"; then
+    printf 'dark\n'
+    return
+  fi
+
+  printf '%s\n' "$mode"
+}
+
+ghostty_theme_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    tokyo:light) printf 'TokyoNight Day\n' ;;
+    tokyo:dark) printf 'TokyoNight Night\n' ;;
+    catppuccin:light) printf 'Catppuccin Latte\n' ;;
+    catppuccin:dark) printf 'Catppuccin Mocha\n' ;;
+    rose-pine:light) printf 'Rose Pine Dawn\n' ;;
+    rose-pine:dark) printf 'Rose Pine\n' ;;
+    kanagawa:light) printf 'Kanagawa Lotus\n' ;;
+    kanagawa:dark) printf 'Kanagawa Wave\n' ;;
+    gruvbox:light) printf 'Gruvbox Light\n' ;;
+    gruvbox:dark) printf 'Gruvbox Dark\n' ;;
+    one:light) printf 'Atom One Light\n' ;;
+    one:dark) printf 'Atom One Dark\n' ;;
+    solarized:light) printf 'iTerm2 Solarized Light\n' ;;
+    solarized:dark) printf 'iTerm2 Solarized Dark\n' ;;
+    dracula:dark) printf 'Dracula\n' ;;
+    nord:light) printf 'Nord Light\n' ;;
+    nord:dark) printf 'Nord\n' ;;
+    vesper:dark) printf 'Vesper\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+herdr_theme_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    tokyo:light) printf 'tokyo-night-day\n' ;;
+    tokyo:dark) printf 'tokyo-night\n' ;;
+    catppuccin:light) printf 'catppuccin-latte\n' ;;
+    catppuccin:dark) printf 'catppuccin\n' ;;
+    rose-pine:light) printf 'rose-pine-dawn\n' ;;
+    rose-pine:dark) printf 'rose-pine\n' ;;
+    kanagawa:light) printf 'kanagawa-lotus\n' ;;
+    kanagawa:dark) printf 'kanagawa\n' ;;
+    gruvbox:light) printf 'gruvbox-light\n' ;;
+    gruvbox:dark) printf 'gruvbox\n' ;;
+    one:light) printf 'one-light\n' ;;
+    one:dark) printf 'one-dark\n' ;;
+    solarized:light) printf 'solarized-light\n' ;;
+    solarized:dark) printf 'solarized\n' ;;
+    dracula:dark) printf 'dracula\n' ;;
+    nord:light) printf 'nord\n' ;;
+    nord:dark) printf 'nord\n' ;;
+    vesper:dark) printf 'vesper\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+pi_theme_for() {
+  printf '%s\n' "$pi_theme_name"
+}
+
+nvim_colorscheme_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    tokyo:light|tokyo:dark) printf 'tokyonight\n' ;;
+    catppuccin:light) printf 'catppuccin-latte\n' ;;
+    catppuccin:dark) printf 'catppuccin-mocha\n' ;;
+    rose-pine:light) printf 'rose-pine-dawn\n' ;;
+    rose-pine:dark) printf 'rose-pine\n' ;;
+    kanagawa:light) printf 'kanagawa-lotus\n' ;;
+    kanagawa:dark) printf 'kanagawa-wave\n' ;;
+    gruvbox:light|gruvbox:dark) printf 'gruvbox\n' ;;
+    one:light|one:dark) printf 'onedark\n' ;;
+    solarized:light|solarized:dark) printf 'solarized\n' ;;
+    dracula:dark) printf 'dracula\n' ;;
+    nord:light|nord:dark) printf 'nord\n' ;;
+    vesper:dark) printf 'vesper\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+nvim_style_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    tokyo:light) printf 'day\n' ;;
+    tokyo:dark) printf 'night\n' ;;
+    catppuccin:light) printf 'latte\n' ;;
+    catppuccin:dark) printf 'mocha\n' ;;
+    rose-pine:light) printf 'dawn\n' ;;
+    rose-pine:dark) printf 'main\n' ;;
+    kanagawa:light) printf 'lotus\n' ;;
+    kanagawa:dark) printf 'wave\n' ;;
+    one:light) printf 'light\n' ;;
+    one:dark) printf 'dark\n' ;;
+    *) return 0 ;;
+  esac
+}
+
+nvim_flavour_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    catppuccin:light) printf 'latte\n' ;;
+    catppuccin:dark) printf 'mocha\n' ;;
+    *) return 0 ;;
+  esac
+}
+
+nvim_variant_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    rose-pine:light) printf 'dawn\n' ;;
+    rose-pine:dark) printf 'main\n' ;;
+    *) return 0 ;;
+  esac
+}
+
+nvim_background_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+  printf '%s\n' "$mode"
+}
+
+delta_arg_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$mode" in
+    light) printf '%s\n' '--light' ;;
+    dark) printf '%s\n' '--dark' ;;
+    *) return 1 ;;
+  esac
+}
+
+real_delta_bin() {
+  if [[ -n "${DELTA_REAL:-}" && -x "${DELTA_REAL:-}" ]]; then
+    printf '%s\n' "$DELTA_REAL"
+    return 0
+  fi
+
+  local IFS=':' dir candidate
+  for dir in $PATH; do
+    candidate="$dir/delta"
+    if [[ -x "$candidate" && "$candidate" != "$HOME/.local/bin/delta" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in /opt/homebrew/bin/delta /usr/local/bin/delta /opt/local/bin/delta /usr/bin/delta; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+palette_for() {
+  local profile="$1"
+  local mode
+  mode="$(effective_mode "$profile" "$2")"
+
+  case "$profile:$mode" in
+    tokyo:light) printf '#2e7de9 #9854f1 #007197 #587539 #8c6c3e #f52a65\n' ;;
+    tokyo:dark) printf '#7aa2f7 #bb9af7 #7dcfff #9ece6a #e0af68 #f7768e\n' ;;
+    catppuccin:light) printf '#1e66f5 #8839ef #04a5e5 #40a02b #df8e1d #d20f39\n' ;;
+    catppuccin:dark) printf '#89b4fa #cba6f7 #89dceb #a6e3a1 #f9e2af #f38ba8\n' ;;
+    rose-pine:light) printf '#286983 #907aa9 #56949f #569f7a #ea9d34 #b4637a\n' ;;
+    rose-pine:dark) printf '#31748f #c4a7e7 #9ccfd8 #9ccfd8 #f6c177 #eb6f92\n' ;;
+    kanagawa:light) printf '#4d699b #624c83 #5e857a #6f894e #cc6d00 #c84053\n' ;;
+    kanagawa:dark) printf '#7e9cd8 #957fb8 #7aa89f #98bb6c #ffa066 #e46876\n' ;;
+    gruvbox:light) printf '#076678 #8f3f71 #427b58 #79740e #af3a03 #9d0006\n' ;;
+    gruvbox:dark) printf '#83a598 #d3869b #8ec07c #b8bb26 #fabd2f #fb4934\n' ;;
+    one:light) printf '#4078f2 #a626a4 #0184bc #50a14f #c18401 #e45649\n' ;;
+    one:dark) printf '#61afef #c678dd #56b6c2 #98c379 #e5c07b #e06c75\n' ;;
+    solarized:light) printf '#268bd2 #6c71c4 #2aa198 #859900 #b58900 #dc322f\n' ;;
+    solarized:dark) printf '#268bd2 #6c71c4 #2aa198 #859900 #b58900 #dc322f\n' ;;
+    dracula:dark) printf '#8be9fd #bd93f9 #ff79c6 #50fa7b #f1fa8c #ff5555\n' ;;
+    nord:light) printf '#5e81ac #b48ead #88c0d0 #a3be8c #ebcb8b #bf616a\n' ;;
+    nord:dark) printf '#81a1c1 #b48ead #8fbcbb #a3be8c #ebcb8b #bf616a\n' ;;
+    vesper:dark) printf '#8e8ee8 #ff8080 #99ffe4 #ffc799 #ffee99 #ff5555\n' ;;
+    *) return 1 ;;
+  esac
+}
+
+ansi_block() {
+  local hex="${1#\#}"
+  local r g b
+  r=$((16#${hex:0:2}))
+  g=$((16#${hex:2:2}))
+  b=$((16#${hex:4:2}))
+  printf '\033[48;2;%d;%d;%dm  \033[0m' "$r" "$g" "$b"
+}
+
+render_swatches() {
+  local color
+  for color in $(palette_for "$1" "$2"); do
+    ansi_block "$color"
+    printf ' '
+  done
+}
+
+nvim_desc_for() {
+  local profile="$1"
+  local mode="$2"
+  local colorscheme style flavour variant background desc
+  colorscheme="$(nvim_colorscheme_for "$profile" "$mode")"
+  style="$(nvim_style_for "$profile" "$mode")"
+  flavour="$(nvim_flavour_for "$profile" "$mode")"
+  variant="$(nvim_variant_for "$profile" "$mode")"
+  background="$(nvim_background_for "$profile" "$mode")"
+
+  desc="$colorscheme"
+  [[ -n "$style" ]] && desc="$desc style=$style"
+  [[ -n "$flavour" ]] && desc="$desc flavour=$flavour"
+  [[ -n "$variant" ]] && desc="$desc variant=$variant"
+  [[ -n "$background" ]] && desc="$desc background=$background"
+  printf '%s\n' "$desc"
+}
+
+lua_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+lua_string_field() {
+  local key="$1"
+  local value="$2"
+  [[ -n "$value" ]] || return 0
+  printf '  %s = "%s",\n' "$key" "$(lua_escape "$value")"
+}
+
+write_nvim_config() {
+  local profile="$1"
+  local mode="$2"
+  local eff colorscheme style flavour variant background tmp
+  eff="$(effective_mode "$profile" "$mode")"
+  colorscheme="$(nvim_colorscheme_for "$profile" "$mode")"
+  style="$(nvim_style_for "$profile" "$mode")"
+  flavour="$(nvim_flavour_for "$profile" "$mode")"
+  variant="$(nvim_variant_for "$profile" "$mode")"
+  background="$(nvim_background_for "$profile" "$mode")"
+  tmp="$nvim_config.tmp"
+
+  {
+    printf '%s\n' '-- Generated by theme. Do not edit.'
+    printf 'return {\n'
+    lua_string_field profile "$profile"
+    lua_string_field mode "$mode"
+    lua_string_field effective_mode "$eff"
+    lua_string_field colorscheme "$colorscheme"
+    lua_string_field style "$style"
+    lua_string_field flavour "$flavour"
+    lua_string_field variant "$variant"
+    lua_string_field background "$background"
+    printf '  transparent = true,\n'
+    printf '}\n'
+  } > "$tmp"
+  mv "$tmp" "$nvim_config"
+}
+
+write_state_files() {
+  local profile="$1"
+  local mode="$2"
+
+  mkdir -p "$theme_dir"
+  printf '%s\n' "$profile" > "$profile_file"
+  printf '%s\n' "$mode" > "$mode_file"
+}
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+palette_color() {
+  local profile="$1"
+  local mode="$2"
+  local index="$3"
+  local colors
+  colors="$(palette_for "$profile" "$mode")"
+  # shellcheck disable=SC2086
+  set -- $colors
+  eval "printf '%s\\n' \${$index}"
+}
+
+write_herdr_config() {
+  local theme_name="$1"
+  [[ -f "$herdr_config" ]] || return 0
+
+  python3 - "$herdr_config" "$theme_name" <<'HERDRPY'
+import pathlib, sys
+path = pathlib.Path(sys.argv[1])
+theme = sys.argv[2]
+lines = path.read_text().splitlines()
+out = []
+in_theme = False
+saw_theme = False
+saw_name = False
+for line in lines:
+    stripped = line.strip()
+    if stripped.startswith('[') and stripped.endswith(']'):
+        if in_theme and not saw_name:
+            out.append(f'name = "{theme}"')
+            saw_name = True
+        in_theme = stripped == '[theme]'
+        saw_theme = saw_theme or in_theme
+        out.append(line)
+        continue
+    if in_theme and stripped.startswith('name') and '=' in stripped:
+        out.append(f'name = "{theme}"')
+        saw_name = True
+    else:
+        out.append(line)
+if not saw_theme:
+    if out and out[-1] != '':
+        out.append('')
+    out.extend(['[theme]', f'name = "{theme}"'])
+elif in_theme and not saw_name:
+    out.append(f'name = "{theme}"')
+path.write_text('\n'.join(out) + '\n')
+HERDRPY
+}
+
+write_pi_theme() {
+  local profile="$1"
+  local mode="$2"
+  local eff blue magenta cyan green yellow red text muted dim border_muted selected user_bg custom_bg pending_bg success_bg error_bg
+  eff="$(effective_mode "$profile" "$mode")"
+  blue="$(palette_color "$profile" "$mode" 1)"
+  magenta="$(palette_color "$profile" "$mode" 2)"
+  cyan="$(palette_color "$profile" "$mode" 3)"
+  green="$(palette_color "$profile" "$mode" 4)"
+  yellow="$(palette_color "$profile" "$mode" 5)"
+  red="$(palette_color "$profile" "$mode" 6)"
+
+  if [[ "$eff" == "light" ]]; then
+    text="#1f2328"; muted="#6c6c6c"; dim="#767676"; border_muted="#b8b8b8"
+    selected="#d8dee9"; user_bg="#f1f3f5"; custom_bg="#eee8f7"; pending_bg="#eceff7"; success_bg="#e8f3e8"; error_bg="#f6e8e8"
+  else
+    text="#d4d4d4"; muted="#9aa0a6"; dim="#666666"; border_muted="#505050"
+    selected="#303545"; user_bg="#242631"; custom_bg="#2d2838"; pending_bg="#282832"; success_bg="#283228"; error_bg="#3c2828"
+  fi
+
+  mkdir -p "$pi_theme_dir"
+  cat > "$pi_theme_file.tmp" <<PITHEME
+{
+  "\$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "name": "$pi_theme_name",
+  "vars": {
+    "accent": "$cyan",
+    "cyan": "$cyan",
+    "blue": "$blue",
+    "magenta": "$magenta",
+    "green": "$green",
+    "yellow": "$yellow",
+    "red": "$red",
+    "text": "$text",
+    "muted": "$muted",
+    "dim": "$dim",
+    "borderMuted": "$border_muted",
+    "selectedBg": "$selected",
+    "userMsgBg": "$user_bg",
+    "customMsgBg": "$custom_bg",
+    "toolPendingBg": "$pending_bg",
+    "toolSuccessBg": "$success_bg",
+    "toolErrorBg": "$error_bg"
+  },
+  "colors": {
+    "accent": "accent",
+    "border": "blue",
+    "borderAccent": "accent",
+    "borderMuted": "borderMuted",
+    "success": "green",
+    "error": "red",
+    "warning": "yellow",
+    "muted": "muted",
+    "dim": "dim",
+    "text": "text",
+    "thinkingText": "muted",
+    "selectedBg": "selectedBg",
+    "userMessageBg": "userMsgBg",
+    "userMessageText": "text",
+    "customMessageBg": "customMsgBg",
+    "customMessageText": "text",
+    "customMessageLabel": "magenta",
+    "toolPendingBg": "toolPendingBg",
+    "toolSuccessBg": "toolSuccessBg",
+    "toolErrorBg": "toolErrorBg",
+    "toolTitle": "text",
+    "toolOutput": "muted",
+    "mdHeading": "yellow",
+    "mdLink": "blue",
+    "mdLinkUrl": "dim",
+    "mdCode": "accent",
+    "mdCodeBlock": "green",
+    "mdCodeBlockBorder": "muted",
+    "mdQuote": "muted",
+    "mdQuoteBorder": "muted",
+    "mdHr": "muted",
+    "mdListBullet": "accent",
+    "toolDiffAdded": "green",
+    "toolDiffRemoved": "red",
+    "toolDiffContext": "muted",
+    "syntaxComment": "muted",
+    "syntaxKeyword": "blue",
+    "syntaxFunction": "yellow",
+    "syntaxVariable": "accent",
+    "syntaxString": "green",
+    "syntaxNumber": "magenta",
+    "syntaxType": "cyan",
+    "syntaxOperator": "text",
+    "syntaxPunctuation": "text",
+    "thinkingOff": "borderMuted",
+    "thinkingMinimal": "dim",
+    "thinkingLow": "blue",
+    "thinkingMedium": "accent",
+    "thinkingHigh": "magenta",
+    "thinkingXhigh": "red",
+    "bashMode": "green"
+  }
+}
+PITHEME
+  mv "$pi_theme_file.tmp" "$pi_theme_file"
+}
+
+write_pi_settings() {
+  mkdir -p "$(dirname "$pi_settings")"
+  python3 - "$pi_settings" "$pi_theme_name" <<'PIPY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+theme = sys.argv[2]
+if path.exists():
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        data = {}
+else:
+    data = {}
+data["theme"] = theme
+path.write_text(json.dumps(data, indent=2) + "\n")
+PIPY
+}
+
+reload_ghostty_quietly() {
+  command -v osascript >/dev/null 2>&1 || return 1
+  osascript \
+    -e 'tell application id "com.mitchellh.ghostty" to activate' \
+    -e 'tell application "System Events" to keystroke "," using {command down, shift down}' \
+    >/dev/null 2>&1
+}
+
+write_runtime_files() {
+  local profile="$1"
+  local mode="$2"
+  local eff ghostty_theme tmp
+  eff="$(effective_mode "$profile" "$mode")"
+  ghostty_theme="$(ghostty_theme_for "$profile" "$mode")"
+  mkdir -p "$theme_dir"
+
+  tmp="$ghostty_config.tmp"
+  {
+    printf '%s\n' '# Generated by theme. Do not edit.'
+    printf '# profile = %s\n' "$profile"
+    printf '# mode = %s\n' "$mode"
+    if [[ "$eff" != "$mode" ]]; then
+      printf '# effective-mode = %s (light unavailable for %s)\n' "$eff" "$profile"
+    fi
+    printf 'theme = %s\n' "$ghostty_theme"
+  } > "$tmp"
+  mv "$tmp" "$ghostty_config"
+
+  write_nvim_config "$profile" "$mode"
+  herdr_theme_for "$profile" "$mode" > "$herdr_theme_file"
+  write_herdr_config "$(herdr_theme_for "$profile" "$mode")"
+  write_pi_theme "$profile" "$mode"
+  write_pi_settings
+}
+
+reload_herdr_quietly() {
+  if command -v herdr >/dev/null 2>&1; then
+    herdr server reload-config >/dev/null 2>&1 || true
+  fi
+}
+
+print_change_hint() {
+  local profile="$1"
+  local mode="$2"
+  local eff
+  eff="$(effective_mode "$profile" "$mode")"
+
+  printf 'Theme: profile=%s mode=%s' "$profile" "$mode"
+  if [[ "$eff" != "$mode" ]]; then
+    printf ' effective_mode=%s' "$eff"
+  fi
+  printf '\n'
+  printf 'Generated: %s, %s, %s, and %s\n' "$ghostty_config" "$nvim_config" "$herdr_theme_file" "$pi_theme_file"
+  printf 'Applied: Herdr config theme=%s; Pi theme=%s\n' "$(herdr_theme_for "$profile" "$mode")" "$pi_theme_name"
+  printf 'Reload: attempted Ghostty Cmd+Shift+, automatically. If macOS blocks it, grant Ghostty accessibility permission or reload manually. Neovim updates on focus or via :ThemeReload; new Pi sessions use the generated theme, and running sessions should repaint if their custom-theme watcher is active.\n'
+}
+
+set_profile() {
+  local profile="$1"
+  local mode
+
+  if ! profile_is_valid "$profile"; then
+    printf 'theme: unknown profile: %s\n\n' "$profile" >&2
+    usage >&2
+    printf '\nAvailable profiles:\n' >&2
+    profiles >&2
+    exit 2
+  fi
+
+  mode="$(current_mode)"
+  write_state_files "$profile" "$mode"
+  write_runtime_files "$profile" "$mode"
+  reload_herdr_quietly
+  reload_ghostty_quietly || true
+  print_change_hint "$profile" "$mode"
+}
+
+set_mode() {
+  local mode="$1"
+  local profile
+
+  case "$mode" in
+    light|dark) ;;
+    *)
+      printf 'theme: invalid mode: %s\n' "$mode" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+
+  profile="$(current_profile)"
+  write_state_files "$profile" "$mode"
+  write_runtime_files "$profile" "$mode"
+  reload_herdr_quietly
+  reload_ghostty_quietly || true
+  print_change_hint "$profile" "$mode"
+}
+
+availability_label() {
+  local profile="$1"
+  if has_light_variant "$profile"; then
+    printf 'light✓ dark✓\n'
+  else
+    printf 'light→dark dark✓\n'
+  fi
+}
+
+list_profiles() {
+  local active_profile active_mode profile marker availability swatches ghostty_theme herdr_theme nvim_desc delta_arg
+  active_profile="$(current_profile)"
+  active_mode="$(current_mode)"
+
+  printf 'Current: profile=%s mode=%s\n\n' "$active_profile" "$active_mode"
+  printf '%-2s %-12s %-17s %-20s %-22s %-18s %-44s %s\n' '' 'profile' 'availability' 'swatches' 'ghostty' 'herdr' 'nvim' 'delta'
+  while IFS= read -r profile; do
+    marker=''
+    [[ "$profile" == "$active_profile" ]] && marker='*'
+    availability="$(availability_label "$profile")"
+    swatches="$(render_swatches "$profile" "$active_mode")"
+    ghostty_theme="$(ghostty_theme_for "$profile" "$active_mode")"
+    herdr_theme="$(herdr_theme_for "$profile" "$active_mode")"
+    nvim_desc="$(nvim_desc_for "$profile" "$active_mode")"
+    delta_arg="$(delta_arg_for "$profile" "$active_mode")"
+    printf '%-2s %-12s %-17s %-20s %-22s %-18s %-44s %s\n' "$marker" "$profile" "$availability" "$swatches" "$ghostty_theme" "$herdr_theme" "$nvim_desc" "$delta_arg"
+  done <<EOF
+$(profiles)
+EOF
+}
+
+preview_profile() {
+  local profile="$1"
+  local mode eff availability
+
+  if ! profile_is_valid "$profile"; then
+    printf 'Unknown profile: %s\n' "$profile" >&2
+    exit 2
+  fi
+
+  printf '%s (%s)\n' "$profile" "$(profile_label "$profile")"
+  printf '%s\n\n' '────────────────────────────────────────'
+
+  for mode in light dark; do
+    eff="$(effective_mode "$profile" "$mode")"
+    if [[ "$mode" != "$eff" ]]; then
+      availability='unavailable; falls back to dark'
+    else
+      availability='available'
+    fi
+
+    printf 'Mode: %s (%s)\n' "$mode" "$availability"
+    printf 'Swatches: '
+    render_swatches "$profile" "$mode"
+    printf '\n'
+    printf 'Ghostty:  %s\n' "$(ghostty_theme_for "$profile" "$mode")"
+    printf 'Herdr:    %s\n' "$(herdr_theme_for "$profile" "$mode")"
+    printf 'Neovim:   %s\n' "$(nvim_desc_for "$profile" "$mode")"
+    printf 'Pi:       %s (%s)\n' "$(pi_theme_for "$profile" "$mode")" "$pi_theme_file"
+    printf 'Delta:    delta %s\n\n' "$(delta_arg_for "$profile" "$mode")"
+  done
+}
+
+pick_profile() {
+  if ! command -v fzf >/dev/null 2>&1; then
+    printf 'theme: fzf is required for "theme pick". Install fzf, or run "theme list" and "theme use <profile>".\n' >&2
+    exit 1
+  fi
+
+  local script_path preview_cmd selected
+  script_path="${BASH_SOURCE[0]}"
+  if [[ ! -f "$script_path" ]]; then
+    script_path="$(command -v -- "$0" 2>/dev/null || printf '%s' "$0")"
+  fi
+  printf -v preview_cmd 'bash %q __preview {}' "$script_path"
+
+  selected="$(profiles | fzf --ansi --prompt='theme> ' --height='80%' --reverse --border --preview="$preview_cmd" --preview-window='right:60%:wrap')" || exit 130
+  [[ -n "$selected" ]] || exit 130
+  set_profile "$selected"
+}
+
+print_status() {
+  local profile mode eff
+  profile="$(current_profile)"
+  mode="$(current_mode)"
+  eff="$(effective_mode "$profile" "$mode")"
+
+  printf 'profile=%s\n' "$profile"
+  printf 'mode=%s\n' "$mode"
+  printf 'effective_mode=%s\n' "$eff"
+  printf 'ghostty=%s\n' "$(ghostty_theme_for "$profile" "$mode")"
+  printf 'herdr=%s\n' "$(herdr_theme_for "$profile" "$mode")"
+  printf 'nvim=%s\n' "$(nvim_desc_for "$profile" "$mode")"
+  printf 'pi=%s\n' "$(pi_theme_for "$profile" "$mode")"
+  printf 'delta=%s\n' "$(delta_arg_for "$profile" "$mode")"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  list)
+    list_profiles
+    ;;
+  pick)
+    pick_profile
+    ;;
+  use)
+    shift
+    if [[ $# -ne 1 ]]; then
+      printf 'theme: usage: theme use <profile>\n' >&2
+      exit 2
+    fi
+    set_profile "$1"
+    ;;
+  light|dark)
+    set_mode "$cmd"
+    ;;
+  toggle)
+    case "$(current_mode)" in
+      light) set_mode dark ;;
+      dark) set_mode light ;;
+    esac
+    ;;
+  status)
+    print_status
+    ;;
+  delta)
+    shift
+    delta_bin="$(real_delta_bin)" || {
+      printf 'theme: could not find the real delta binary\n' >&2
+      exit 1
+    }
+    exec "$delta_bin" "$(delta_arg_for "$(current_profile)" "$(current_mode)")" "$@"
+    ;;
+  __preview)
+    shift
+    if [[ $# -ne 1 ]]; then
+      printf 'theme: usage: theme __preview <profile>\n' >&2
+      exit 2
+    fi
+    preview_profile "$1"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  '')
+    usage >&2
+    exit 2
+    ;;
+  *)
+    printf 'theme: unknown command: %s\n' "$cmd" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

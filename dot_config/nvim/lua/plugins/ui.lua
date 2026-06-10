@@ -5,6 +5,15 @@
 -------------------------------------------------------------------------------
 vim.pack.add({
   { src = "https://github.com/folke/tokyonight.nvim" },
+  { src = "https://github.com/catppuccin/nvim", name = "catppuccin" },
+  { src = "https://github.com/ellisonleao/gruvbox.nvim" },
+  { src = "https://github.com/rebelot/kanagawa.nvim" },
+  { src = "https://github.com/rose-pine/neovim", name = "rose-pine" },
+  { src = "https://github.com/Mofiqul/dracula.nvim" },
+  { src = "https://github.com/shaunsingh/nord.nvim" },
+  { src = "https://github.com/navarasu/onedark.nvim" },
+  { src = "https://github.com/maxmx03/solarized.nvim" },
+  { src = "https://github.com/datsfilipe/vesper.nvim" },
   { src = "https://github.com/echasnovski/mini.icons" },
   { src = "https://github.com/akinsho/bufferline.nvim" },
   { src = "https://github.com/folke/snacks.nvim" },
@@ -12,18 +21,8 @@ vim.pack.add({
 })
 
 -------------------------------------------------------------------------------
--- TokyoNight
+-- Theme plugins are configured by config.theme at startup/reload
 -------------------------------------------------------------------------------
-pcall(function()
-  require("tokyonight").setup({
-    style = "night",
-    transparent = true,
-    styles = {
-      sidebars = "transparent",
-      floats = "transparent",
-    },
-  })
-end)
 
 -------------------------------------------------------------------------------
 -- Mini Icons

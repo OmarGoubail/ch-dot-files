@@ -27,6 +27,8 @@
       "ctrl-j": "workspace::ActivatePaneDown",
       "shift-l": "pane::ActivateNextItem",
       "shift-h": "pane::ActivatePreviousItem",
+      "ctrl-alt-u": "terminal::ScrollPageUp",
+      "ctrl-alt-d": "terminal::ScrollPageDown",
       "cmd-w": [
         "action::Sequence",
         ["pane::CloseActiveItem", "workspace::FocusCenterPane"]
@@ -189,6 +191,14 @@
       "space g h R": "git::RestoreFile",
 
       "space c z": "workspace::ToggleCenteredLayout",
+      "space z z": [
+        "action::Sequence",
+        [
+          "workspace::ToggleAllDocks",
+          "workspace::ToggleZoom",
+          "workspace::ToggleCenteredLayout"
+        ]
+      ],
 
       // Toggle inlay hints
       "space u i": "editor::ToggleInlayHints",

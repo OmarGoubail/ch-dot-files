@@ -1,0 +1,84 @@
+[user]
+	name = Omar Goubail
+	email = omars.goubail@gmail.com
+
+[core]
+	editor = nvim
+	autocrlf = false
+	safecrlf = true
+	pager = theme delta
+
+[init]
+	defaultBranch = master
+
+[pull]
+	rebase = true
+
+[push]
+	default = simple
+	autoSetupRemote = true
+
+[merge]
+	tool = nvim
+	conflictStyle = zdiff3
+
+[diff]
+	tool = nvim
+
+[alias]
+	st = status
+	co = checkout
+	br = branch
+	ci = commit
+	ca = commit -a
+	cm = commit -m
+	cam = commit -am
+	unstage = reset HEAD --
+	last = log -1 HEAD
+	visual = !gitk
+	lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+	up = pull --rebase origin
+	ps = push origin
+	pf = push --force-with-lease
+	amend = commit --amend --no-edit
+	fixup = commit --fixup
+	squash = commit --squash
+  conflict-help = "!echo '\nDuring rebase: ours=main, theirs=feature\nDuring merge: ours=feature, theirs=main\n'"
+
+[color]
+	ui = auto
+
+[color "branch"]
+	current = yellow reverse
+	local = yellow
+	remote = green
+
+[color "diff"]
+	meta = yellow bold
+	frag = magenta bold
+	old = red
+	new = green
+
+[color "status"]
+	added = yellow
+	changed = green
+	untracked = cyan
+
+[rerere]
+	enabled = true
+
+[help]
+	autocorrect = 1
+
+[fetch]
+	prune = true
+
+[rebase]
+	autoStash = true
+
+[status]
+	showUntrackedFiles = all
+[interactive]
+	diffFilter = theme delta --color-only
+[delta]
+	navigate = true

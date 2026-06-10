@@ -206,6 +206,12 @@
   },
   // LSP
   "lsp": {
+    "expert": {
+      "binary": {
+        "ignore_system_version": true,
+        "path": "/.local/bin/expert_darwin_arm64"
+      }
+    },
     "tailwindcss-language-server": {
       "settings": {
         "classAttributes": ["class", "className", "ngClass", "styles"],
@@ -214,7 +220,19 @@
   },
   "languages": {
     // Refer https://zed.dev/docs/languages/javascript and https://zed.dev/docs/languages/typescript for more info
+   "Elixir": {
+         "format_on_save": "on",
+         "language_servers": [
+           "expert",
+           "!elixir-ls",
+           "!next-ls",
+           "!lexical",
+           "..."
+         ]
+    },
     "Markdown": {
+      "preferred_line_length": 88,
+      "soft_wrap": "preferred_line_length",
       "show_edit_predictions": false,
     },
     "TypeScript": {

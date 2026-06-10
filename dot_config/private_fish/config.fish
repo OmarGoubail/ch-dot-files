@@ -80,6 +80,10 @@ function wtc
     wt switch --create $argv[1] && wt step copy-ignored
 end
 
+function delta --wraps delta --description "Run delta with the current theme mode"
+    theme delta $argv
+end
+
 # === Tool Init (cached for fast startup) ===
 # Run `fish_cache_regen` after updating these tools
 set -l _cache $HOME/.cache/fish-init

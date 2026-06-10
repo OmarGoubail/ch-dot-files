@@ -25,25 +25,47 @@ require("config.autocmds")
 require("config.keymaps")
 require("config.pack")
 
--- Colorscheme (with fallback)
-local ok = pcall(vim.cmd.colorscheme, "tokyonight")
-if not ok then
-  vim.cmd.colorscheme("habamax")
-end
+local theme = require("config.theme")
 
 -- Transparency: remove backgrounds for terminal transparency
+local transparent_groups = {
+	"Normal",
+	"NormalNC",
+	"NormalFloat",
+	"NormalSB",
+	"SignColumn",
+	"StatusLine",
+	"StatusLineNC",
+	"Pmenu",
+	"PmenuSel",
+	"OilDir",
+	"OilDirIcon",
+}
+
+local function apply_transparency()
+	for _, group in ipairs(transparent_groups) do
+		pcall(vim.api.nvim_set_hl, 0, group, { bg = "NONE" })
+	end
+end
+
 vim.api.nvim_create_autocmd("ColorScheme", {
-  callback = function()
-    local groups = {
-      "Normal", "NormalNC", "NormalFloat", "NormalSB",
-      "SignColumn", "StatusLine", "StatusLineNC",
-      "Pmenu", "PmenuSel",
-      "OilDir", "OilDirIcon",
-    }
-    for _, group in ipairs(groups) do
-      pcall(vim.api.nvim_set_hl, 0, group, { bg = "NONE" })
-    end
-  end,
+	callback = apply_transparency,
 })
--- Trigger it now
-vim.cmd("doautocmd ColorScheme")
+
+-- Colorscheme (with generated theme state and fallback)
+theme.apply()
+apply_transparency()
+
+vim.api.nvim_create_user_command("ThemeReload", function()
+	theme.apply()
+	apply_transparency()
+end, { desc = "Reload generated theme state" })
+
+vim.api.nvim_create_autocmd("FocusGained", {
+	callback = function()
+		local _, changed = theme.apply_if_changed()
+		if changed then
+			apply_transparency()
+		end
+	end,
+})

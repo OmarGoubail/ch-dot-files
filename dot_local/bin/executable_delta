@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_delta_bin() {
+  if [[ -n "${DELTA_REAL:-}" && -x "${DELTA_REAL:-}" ]]; then
+    printf '%s\n' "$DELTA_REAL"
+    return 0
+  fi
+
+  local IFS=':' dir candidate
+  for dir in $PATH; do
+    candidate="$dir/delta"
+    if [[ -x "$candidate" && "$candidate" != "$HOME/.local/bin/delta" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in /opt/homebrew/bin/delta /usr/local/bin/delta /opt/local/bin/delta /usr/bin/delta; do
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+real_delta="$(real_delta_bin)" || {
+  printf 'delta wrapper: could not find the real delta binary\n' >&2
+  exit 1
+}
+
+if [[ -n "${DELTA_THEME_BYPASS:-}" ]]; then
+  exec "$real_delta" "$@"
+fi
+
+theme_bin="${THEME_BIN:-$HOME/.local/bin/theme}"
+if [[ -x "$theme_bin" ]]; then
+  DELTA_REAL="$real_delta" DELTA_THEME_BYPASS=1 exec "$theme_bin" delta "$@"
+fi
+
+exec "$real_delta" "$@"

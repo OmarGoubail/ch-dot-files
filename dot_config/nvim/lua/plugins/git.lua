@@ -1,4 +1,4 @@
--- Git: diffview (primary diff tool), neogit, gitsigns
+-- Git: diffview (primary diff tool), lazygit, gitsigns
 
 local map = vim.keymap.set
 
@@ -7,12 +7,11 @@ local map = vim.keymap.set
 -------------------------------------------------------------------------------
 vim.pack.add({
   { src = "https://github.com/sindrets/diffview.nvim" },
-  { src = "https://github.com/NeogitOrg/neogit" },
   { src = "https://github.com/lewis6991/gitsigns.nvim" },
 })
 
 -------------------------------------------------------------------------------
--- Diffview.nvim (primary diff viewer -- replaces lazygit for viewing diffs)
+-- Diffview.nvim (primary diff viewer)
 -------------------------------------------------------------------------------
 pcall(function()
   require("diffview").setup({
@@ -44,22 +43,12 @@ pcall(function()
 end)
 
 -------------------------------------------------------------------------------
--- Neogit (git client for staging/committing)
+-- Lazygit (git client for staging/committing)
 -------------------------------------------------------------------------------
 pcall(function()
-  require("neogit").setup({
-    integrations = {
-      diffview = true,
-    },
-    kind = "tab",
-    signs = {
-      section = { "▸", "▾" },
-      item = { "▸", "▾" },
-    },
-  })
-
-  map("n", "<leader>gg", "<cmd>Neogit<cr>", { desc = "Neogit" })
-  map("n", "<leader>gc", "<cmd>Neogit commit<cr>", { desc = "Neogit Commit" })
+  map("n", "<leader>gg", function()
+    Snacks.lazygit()
+  end, { desc = "Lazygit" })
 end)
 
 -------------------------------------------------------------------------------
