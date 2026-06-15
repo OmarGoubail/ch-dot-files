@@ -7,4 +7,4 @@ stage = "all"
 
 [step.copy-ignored]
 # Keep per-worktree copies from pulling large editor/index caches.
-exclude = [".expert/"]
+exclude = [".expert/", ".dexter/"]

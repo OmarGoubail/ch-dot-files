@@ -109,8 +109,12 @@ pcall(function()
       heex = { "mix" },
       rust = { "rustfmt" },
     },
-    format_on_save = function()
+    format_on_save = function(bufnr)
       if vim.g.autoformat == false then
+        return
+      end
+      local ft = vim.bo[bufnr].filetype
+      if ft == "elixir" or ft == "eelixir" or ft == "heex" then
         return
       end
       return { timeout_ms = 3000, lsp_fallback = true }

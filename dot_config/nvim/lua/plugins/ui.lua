@@ -82,4 +82,5 @@ pcall(function()
     attach_mode = "global",
   })
   vim.keymap.set("n", "<leader>cs", "<cmd>AerialToggle<cr>", { desc = "Aerial (Symbols)" })
+  vim.keymap.set("n", "<leader>ss", "<cmd>AerialToggle<cr>", { desc = "Document Symbols (Aerial)" })
 end)

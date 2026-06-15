@@ -105,7 +105,7 @@ opt.exrc = true
 -- Performance: ignore large directories
 opt.wildignore:append({
   "*/_build/*", "*/deps/*", "*/node_modules/*",
-  "*/.elixir_ls/*", "*/.expert/*", "*/.git/*",
+  "*/.elixir_ls/*", "*/.expert/*", "*/.dexter/*", "*/.git/*",
 })
 
 -- Enable built-in plugins

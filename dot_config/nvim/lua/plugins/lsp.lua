@@ -76,6 +76,8 @@ vim.diagnostic.config({
 -------------------------------------------------------------------------------
 -- LSP on_attach: keymaps + completion
 -------------------------------------------------------------------------------
+local dexter_format_augroup = vim.api.nvim_create_augroup("DexterFormat", { clear = true })
+
 vim.api.nvim_create_autocmd("LspAttach", {
   callback = function(event)
     local buf = event.buf
@@ -97,6 +99,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
     bmap("n", "K", vim.lsp.buf.hover, "Hover")
     bmap({ "n", "i" }, "<C-k>", vim.lsp.buf.signature_help, "Signature Help")
 
+    -- Symbols
+    if client:supports_method("workspace/symbol") then
+      bmap("n", "<leader>sS", vim.lsp.buf.workspace_symbol, "Workspace Symbols")
+    end
+
     -- Enable built-in LSP completion for this buffer
     if client:supports_method("textDocument/completion") then
       vim.lsp.completion.enable(true, client.id, buf, { autotrigger = true })
@@ -113,6 +120,34 @@ vim.api.nvim_create_autocmd("LspAttach", {
     -- Enable codelens if supported
     if client:supports_method("textDocument/codeLens") then
       vim.lsp.codelens.enable(true, { bufnr = buf })
+    end
+
+    -- Dexter formats Elixir-family buffers on save via its LSP client only.
+    if client.name == "dexter" and client:supports_method("textDocument/formatting") then
+      vim.api.nvim_clear_autocmds({ group = dexter_format_augroup, buffer = buf })
+      local dexter_client_id = client.id
+      local function format_with_dexter()
+        vim.lsp.buf.format({
+          bufnr = buf,
+          timeout_ms = 3000,
+          filter = function(format_client)
+            return format_client.id == dexter_client_id
+          end,
+        })
+      end
+
+      bmap({ "n", "v" }, "<leader>cf", format_with_dexter, "Format with Dexter")
+      vim.api.nvim_create_autocmd("BufWritePre", {
+        group = dexter_format_augroup,
+        buffer = buf,
+        desc = "Format with Dexter LSP",
+        callback = function()
+          if vim.g.autoformat == false then
+            return
+          end
+          format_with_dexter()
+        end,
+      })
     end
   end,
 })
@@ -157,17 +192,15 @@ vim.lsp.config("lua_ls", {
   }, 
 })
 
--- Expert (Elixir LSP)
-vim.lsp.config("expert", {
-  cmd = { os.getenv("HOME") .. "/.local/bin/expert_darwin_arm64", "--stdio" },
+-- Dexter (Elixir LSP)
+vim.lsp.config("dexter", {
+  cmd = { "dexter", "lsp" },
+  root_markers = { ".dexter/dexter.db", ".dexter.db", ".git", "mix.exs" },
   filetypes = { "elixir", "eelixir", "heex" },
-  root_markers = { "mix.exs", "mix.lock", ".git" },
-  settings = {
-    elixir = {
-      dialyzerEnabled = true,
-      enableTestLenses = true,
-      suggestSpecs = true,
-    },
+  init_options = {
+    followDelegates = true,
+    -- stdlibPath = "", -- override Elixir stdlib path (auto-detected)
+    -- debug = false,   -- verbose logging to stderr (view with :LspLog)
   },
 })
 
@@ -227,7 +260,7 @@ vim.lsp.config("rust_analyzer", {
 -------------------------------------------------------------------------------
 vim.lsp.enable({
   "lua_ls",
-  "expert",
+  "dexter",
   "ts_ls",
   "tailwindcss",
   "emmet_ls",
