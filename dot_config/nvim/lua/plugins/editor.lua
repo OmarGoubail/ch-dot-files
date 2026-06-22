@@ -53,20 +53,57 @@ vim.api.nvim_create_autocmd("VimEnter", {
 pcall(function()
 	require("oil").setup({
 		default_file_explorer = true,
+		watch_for_changes = true,
 		view_options = {
 			show_hidden = true,
 		},
+		float = {
+			padding = 5,
+			max_width = 90,
+			max_height = 0.8,
+			border = "rounded",
+			win_options = { winblend = 0 },
+		},
 		keymaps = {
-			-- Disable defaults that conflict with smart-splits
+			-- Keep window navigation keys free
 			["<C-h>"] = false,
 			["<C-j>"] = false,
 			["<C-k>"] = false,
 			["<C-l>"] = false,
+
+			-- Let global <C-s> save work in oil
+			["<C-s>"] = false,
+
+			-- Rebind refresh
+			["<C-r>"] = "actions.refresh",
+
+			-- Close oil and restore the previous buffer (close sidebar window entirely)
+			["<C-c>"] = function()
+				if vim.b.is_oil_sidebar and vim.fn.winnr("$") > 1 then
+					vim.cmd("q")
+				else
+					require("oil.actions").close.callback()
+				end
+			end,
+			["q"] = function()
+				if vim.b.is_oil_sidebar and vim.fn.winnr("$") > 1 then
+					vim.cmd("q")
+				else
+					require("oil.actions").close.callback()
+				end
+			end,
 		},
 	})
+
 	map("n", "-", "<cmd>Oil<cr>", { desc = "Open parent directory" })
 	map("n", "<leader>e", "<cmd>Oil<cr>", { desc = "Explorer (Oil)" })
 	map("n", "<leader>fe", "<cmd>Oil<cr>", { desc = "Explorer (Oil)" })
+	map("n", "<leader>E", "<cmd>Oil --float<cr>", { desc = "Explorer (Oil float)" })
+	map("n", "<leader>se", function()
+		vim.cmd("leftabove 40vsplit")
+		require("oil").open()
+		vim.b.is_oil_sidebar = true
+	end, { desc = "Explorer (Oil sidebar)" })
 end)
 
 -------------------------------------------------------------------------------

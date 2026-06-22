@@ -13,5 +13,6 @@ load("plugins.editor")
 load("plugins.coding")
 load("plugins.git")
 load("plugins.tools")
+load("plugins.herdr-nav") -- after tools so <C-h/j/k/l> win over other mappings
 load("plugins.lsp") -- LSP last: needs mason + treesitter loaded first
 load("plugins.trellis")

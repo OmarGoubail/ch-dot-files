@@ -1,6 +1,6 @@
 local wezterm = require("wezterm")
 local act = wezterm.action
-local smart_splits = require("smart-splits")
+-- local smart_splits = require("smart-splits") -- disabled: using herdr + Ghostty
 local workspaces = require("workspaces")
 
 -- Load smart workspace switcher plugin
@@ -307,11 +307,11 @@ config.keys = {
 	},
 }
 
--- Add smart-splits navigation keys
-local smart_keys = smart_splits.get_smart_splits_keys()
-for _, key in ipairs(smart_keys) do
-	table.insert(config.keys, key)
-end
+-- Add smart-splits navigation keys (disabled: using herdr + Ghostty)
+-- local smart_keys = smart_splits.get_smart_splits_keys()
+-- for _, key in ipairs(smart_keys) do
+-- 	table.insert(config.keys, key)
+-- end
 
 -- Add custom project workspace keys
 local project_keys = workspaces.get_project_keys()
