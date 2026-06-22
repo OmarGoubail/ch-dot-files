@@ -97,7 +97,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 
     -- Info
     bmap("n", "K", vim.lsp.buf.hover, "Hover")
-    bmap({ "n", "i" }, "<C-k>", vim.lsp.buf.signature_help, "Signature Help")
+    bmap({ "n", "i" }, "gK", vim.lsp.buf.signature_help, "Signature Help")
 
     -- Symbols
     if client:supports_method("workspace/symbol") then
