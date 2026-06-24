@@ -54,6 +54,7 @@ pcall(function()
 	require("oil").setup({
 		default_file_explorer = true,
 		watch_for_changes = true,
+		cleanup_delay_ms = false,
 		view_options = {
 			show_hidden = true,
 		},
@@ -77,16 +78,41 @@ pcall(function()
 			-- Rebind refresh
 			["<C-r>"] = "actions.refresh",
 
+			-- Make jumplist navigation visible in oil help
+			["<C-o>"] = { callback = function() vim.cmd.normal({ "<C-o>", bang = true }) end, desc = "Jump back", mode = "n" },
+			["<C-i>"] = { callback = function() vim.cmd.normal({ "<C-i>", bang = true }) end, desc = "Jump forward", mode = "n" },
+
+			-- In the sidebar, open files in the previous window instead of the sidebar
+			["<CR>"] = function()
+				local oil = require("oil")
+				local entry = oil.get_cursor_entry()
+				if not entry then
+					return
+				end
+
+				if vim.w.is_oil_sidebar and entry.type ~= "directory" then
+					local target_win = vim.fn.win_getid(vim.fn.winnr("#"))
+					if target_win ~= 0 and target_win ~= vim.api.nvim_get_current_win() and vim.api.nvim_win_is_valid(target_win) then
+						local path = vim.fs.joinpath(oil.get_current_dir(), entry.name)
+						vim.api.nvim_set_current_win(target_win)
+						vim.cmd("edit " .. vim.fn.fnameescape(path))
+						return
+					end
+				end
+
+				oil.select()
+			end,
+
 			-- Close oil and restore the previous buffer (close sidebar window entirely)
 			["<C-c>"] = function()
-				if vim.b.is_oil_sidebar and vim.fn.winnr("$") > 1 then
+				if vim.w.is_oil_sidebar and vim.fn.winnr("$") > 1 then
 					vim.cmd("q")
 				else
 					require("oil.actions").close.callback()
 				end
 			end,
 			["q"] = function()
-				if vim.b.is_oil_sidebar and vim.fn.winnr("$") > 1 then
+				if vim.w.is_oil_sidebar and vim.fn.winnr("$") > 1 then
 					vim.cmd("q")
 				else
 					require("oil.actions").close.callback()
@@ -102,7 +128,7 @@ pcall(function()
 	map("n", "<leader>se", function()
 		vim.cmd("leftabove 40vsplit")
 		require("oil").open()
-		vim.b.is_oil_sidebar = true
+		vim.w.is_oil_sidebar = true
 	end, { desc = "Explorer (Oil sidebar)" })
 end)
 
