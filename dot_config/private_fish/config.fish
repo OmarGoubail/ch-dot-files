@@ -52,6 +52,10 @@ if test -d $HOME/.fly
     fish_add_path $FLYCTL_INSTALL/bin
 end
 
+# Tuxedo todo.txt location (shared with Obsidian)
+set -gx TODO_DIR /Users/omargoubail/Vault/Journal
+set -gx DONE_FILE $TODO_DIR/done.txt
+
 # Bun
 if test -d $HOME/.bun
     set -gx BUN_INSTALL $HOME/.bun
