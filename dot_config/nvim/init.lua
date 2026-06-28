@@ -25,6 +25,8 @@ require("config.autocmds")
 require("config.keymaps")
 require("config.pack")
 
+require("config.tuxedo").setup()
+
 local theme = require("config.theme")
 
 -- Transparency: remove backgrounds for terminal transparency

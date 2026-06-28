@@ -199,6 +199,7 @@ map("n", "<leader>uI", "<cmd>InspectTree<cr>", { desc = "Inspect Tree" })
 -- Terminal
 -------------------------------------------------------------------------------
 map("n", "<leader>ft", "<cmd>terminal<cr>", { desc = "Terminal" })
+map("n", "<leader>tt", "<cmd>Tuxedo<cr>", { desc = "Tuxedo Todo" })
 map("t", "<C-/>", "<cmd>close<cr>", { desc = "Hide Terminal" })
 map("t", "<Esc><Esc>", "<c-\\><c-n>", { desc = "Enter Normal Mode" })
 

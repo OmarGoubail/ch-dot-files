@@ -8,6 +8,15 @@
 .local/bin/secure-server
 {{- end }}
 
+{{- if and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "cachyos") }}
+# On CachyOS, Omarchy owns the base Hyprland orchestrator configs.
+# We only manage override files in this repo.
+.config/hypr/hyprland.conf
+.config/hypr/hypridle.conf
+.config/hypr/hyprlock.conf
+.config/hypr/hyprsunset.conf
+{{- end }}
+
 {{- if and (eq .chezmoi.os "linux") (eq .chezmoi.osRelease.id "ubuntu") }}
 # Server: skip all desktop configs
 .config/aerospace
