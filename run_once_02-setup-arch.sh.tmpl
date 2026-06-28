@@ -1,0 +1,27 @@
+{{- if not (eq .chezmoi.osRelease.id "arch") -}}
+#!/bin/sh
+exit 0
+{{- else -}}
+#!/bin/bash
+set -euo pipefail
+
+echo "==> Setting up Arch desktop..."
+
+# Install fish if not present
+if ! command -v fish &>/dev/null; then
+    echo "==> Installing fish..."
+    sudo pacman -S --needed --noconfirm fish
+fi
+
+# Set fish as default shell
+FISH_PATH=$(command -v fish)
+if [ "$SHELL" != "$FISH_PATH" ]; then
+    echo "==> Setting fish as default shell..."
+    if ! grep -q "^$FISH_PATH$" /etc/shells 2>/dev/null; then
+        echo "$FISH_PATH" | sudo tee -a /etc/shells >/dev/null
+    fi
+    sudo chsh -s "$FISH_PATH" "$(whoami)"
+fi
+
+echo "==> Arch desktop setup complete."
+{{- end }}
