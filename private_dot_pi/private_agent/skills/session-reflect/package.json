@@ -1,0 +1,21 @@
+{
+  "name": "session-reflect",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "session-db": "tsx scripts/session-db.ts",
+    "test": "vitest run ./tests/session-db.integration.ts"
+  },
+  "dependencies": {
+    "@duckdb/node-api": "^1.5.3-r.3",
+    "commander": "^15.0.0",
+    "fast-glob": "^3.3.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.8"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

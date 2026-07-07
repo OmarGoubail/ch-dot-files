@@ -1,0 +1,23 @@
+{
+  "lastChangelogVersion": "0.80.3",
+  "defaultProvider": "fireworks",
+  "defaultModel": "accounts/fireworks/models/glm-5p2",
+  "npmCommand": [
+    "/opt/homebrew/bin/npm"
+  ],
+  "packages": [
+    "npm:pi-web-access",
+    "npm:pi-vim",
+    "npm:pi-notify",
+    "npm:pi-subagents",
+    "npm:pi-elixir"
+  ],
+  "defaultThinkingLevel": "high",
+  "pi-codex-fast": {
+    "enabled": true
+  },
+  "subagents": {
+    "disableBuiltins": true
+  },
+  "theme": "theme-current"
+}

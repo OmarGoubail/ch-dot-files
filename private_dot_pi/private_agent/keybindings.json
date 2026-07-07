@@ -1,0 +1,29 @@
+{
+  "tui.select.up": [
+    "up",
+    "ctrl+p"
+  ],
+  "tui.select.down": [
+    "down",
+    "ctrl+n"
+  ],
+  "tui.select.pageUp": [
+    "pageUp",
+    "alt+u"
+  ],
+  "tui.select.pageDown": [
+    "pageDown",
+    "alt+d"
+  ],
+  "app.model.cycleForward": [],
+  "app.model.cycleBackward": [],
+  "tui.editor.deleteCharForward": [
+    "delete"
+  ],
+  "app.exit": [
+    "ctrl+alt+shift+d"
+  ],
+  "app.session.delete": [
+    "ctrl+alt+delete"
+  ]
+}

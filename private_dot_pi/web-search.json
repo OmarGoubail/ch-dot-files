@@ -1,0 +1,6 @@
+{
+  "provider": "exa",
+  "workflow": "none",
+  "searchModel": "gemini-2.5-flash",
+  "curatorTimeoutSeconds": 30
+}

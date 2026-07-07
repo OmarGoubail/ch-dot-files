@@ -1,0 +1,197 @@
+/**
+ * gh-guard — Confirmation gate for GitHub CLI write commands
+ *
+ * Allows read-only `gh` commands (view, list, search, api GET, etc.) to pass
+ * through silently. Prompts before any command that would create, modify, or
+ * delete data on GitHub.
+ *
+ * Bypass: prefix the command with GH_GUARD_BYPASS=1 or set the env var.
+ */
+
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
+
+// Map of `gh <command>` to write subcommands.
+const GH_WRITE_COMMANDS: Record<string, string[]> = {
+	pr: [
+		"create",
+		"edit",
+		"close",
+		"reopen",
+		"merge",
+		"comment",
+		"review",
+		"ready",
+		"update-branch",
+		"delete-branch",
+	],
+	issue: [
+		"create",
+		"edit",
+		"close",
+		"reopen",
+		"delete",
+		"comment",
+		"pin",
+		"unpin",
+	],
+	release: ["create", "edit", "delete", "upload"],
+	repo: ["create", "delete", "edit", "fork", "rename", "archive", "unarchive", "sync"],
+	gist: ["create", "edit", "delete"],
+	run: ["rerun", "cancel", "delete"],
+	workflow: ["run", "enable", "disable"],
+	alias: ["set", "delete"],
+	secret: ["set", "remove"],
+	variable: ["set", "delete"],
+	label: ["create", "edit", "delete"],
+	milestone: ["create", "edit", "delete"],
+	project: [
+		"create",
+		"edit",
+		"delete",
+		"close",
+		"reopen",
+		"item-create",
+		"item-edit",
+		"item-archive",
+		"item-delete",
+	],
+	codespace: ["create", "delete"],
+	extension: ["install", "uninstall", "create"],
+	auth: ["logout"],
+};
+
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const SHELL_OP_SPLIT = /\s*(\|\||&&|;|\|)\s*/;
+const GLOBAL_FLAGS_WITH_ARGS = new Set(["-R", "--repo", "-h", "--hostname"]);
+
+function isBypassed(cmd: string): boolean {
+	if (cmd.includes("GH_GUARD_BYPASS=1")) return true;
+	if (process.env.GH_GUARD_BYPASS === "1") return true;
+	return false;
+}
+
+function splitSegments(cmd: string): string[] {
+	return cmd.split(SHELL_OP_SPLIT).filter(Boolean);
+}
+
+/**
+ * Extract the first `gh` invocation in a shell segment, returning the
+ * command/subcommand and (for `gh api`) the HTTP method. Returns null when
+ * the segment does not contain a bare `gh` invocation.
+ */
+function parseGhInvocation(
+	segment: string,
+): { command: string; subcommand: string; method?: string } | null {
+	const match = segment.match(/\bgh(?:\s+|$)/);
+	if (!match) return null;
+
+	const afterGh = segment.slice(match.index! + match[0].length);
+	const rawTokens = afterGh.trim().split(/\s+/).filter(Boolean);
+	const tokens: string[] = [];
+
+	// Skip global flags and their arguments so we can locate the command.
+	let i = 0;
+	while (i < rawTokens.length) {
+		const tok = rawTokens[i];
+		if (tok.startsWith("-")) {
+			if (GLOBAL_FLAGS_WITH_ARGS.has(tok) && i + 1 < rawTokens.length) {
+				i += 2;
+				continue;
+			}
+			// Global boolean flag (e.g. --help, -v) or inline `--repo=owner/name`.
+			i++;
+			continue;
+		}
+		tokens.push(tok);
+		i++;
+	}
+
+	const command = tokens[0] ?? "";
+	const subcommand = tokens[1] ?? "";
+
+	let method: string | undefined;
+	if (command === "api") {
+		const methodIdx = rawTokens.findIndex(
+			(t, idx) => (t === "-X" || t === "--method") && idx + 1 < rawTokens.length,
+		);
+		if (methodIdx !== -1) {
+			method = rawTokens[methodIdx + 1].toUpperCase();
+		} else {
+			const inline = rawTokens.find((t) => t.startsWith("--method="));
+			if (inline) method = inline.slice("--method=".length).toUpperCase();
+		}
+	}
+
+	return { command, subcommand, method };
+}
+
+function isGhWrite(invocation: {
+	command: string;
+	subcommand: string;
+	method?: string;
+}): boolean {
+	if (invocation.command === "api") {
+		if (!invocation.method) return false; // default is GET
+		return WRITE_METHODS.has(invocation.method);
+	}
+
+	const writes = GH_WRITE_COMMANDS[invocation.command];
+	if (!writes) return false;
+	return writes.includes(invocation.subcommand);
+}
+
+function hasGhWrite(cmd: string): boolean {
+	for (const segment of splitSegments(cmd)) {
+		const invocation = parseGhInvocation(segment);
+		if (invocation && isGhWrite(invocation)) return true;
+	}
+	return false;
+}
+
+async function guardGhCommand(
+	cmd: string,
+	ctx: ExtensionContext,
+): Promise<{ block: boolean; reason?: string }> {
+	if (isBypassed(cmd)) return { block: false };
+	if (!hasGhWrite(cmd)) return { block: false };
+
+	if (!ctx.hasUI) {
+		return { block: true, reason: `gh write command blocked in non-interactive mode: ${cmd}` };
+	}
+
+	const ok = await ctx.ui.confirm(
+		"⚠️  GitHub write action",
+		`This command may write to GitHub:\n\n  ${cmd}\n\nAllow?`,
+	);
+
+	if (!ok) return { block: true, reason: "gh write command blocked by user" };
+	return { block: false };
+}
+
+export default function (pi: ExtensionAPI) {
+	// Guard LLM/tool bash invocations.
+	pi.on("tool_call", async (event, ctx) => {
+		if (!isToolCallEventType("bash", event)) return;
+
+		const result = await guardGhCommand(event.input.command, ctx);
+		if (result.block) {
+			return { block: true, reason: result.reason };
+		}
+	});
+
+	// Guard user `!gh` bash invocations.
+	pi.on("user_bash", async (event, ctx) => {
+		const result = await guardGhCommand(event.command, ctx);
+		if (result.block) {
+			return {
+				result: {
+					output: `gh-guard: ${result.reason}\n`,
+					exitCode: 1,
+					cancelled: false,
+					truncated: false,
+				},
+			};
+		}
+	});
+}

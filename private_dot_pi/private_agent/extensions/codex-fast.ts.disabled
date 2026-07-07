@@ -1,0 +1,133 @@
+import { SettingsManager, type ExtensionAPI, type ExtensionContext, type ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+
+const SETTINGS_KEY = "pi-codex-fast";
+const PROVIDER_PREFIX = "openai-codex";
+
+type JsonRecord = Record<string, unknown>;
+type InternalSettingsManager = SettingsManager & {
+	settings?: JsonRecord;
+	globalSettings?: JsonRecord;
+	markModified?: (field: string) => void;
+	save?: () => void;
+};
+
+function isRecord(value: unknown): value is JsonRecord {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function settingValue(value: unknown): boolean | undefined {
+	if (typeof value === "boolean") return value;
+	if (isRecord(value) && typeof value.enabled === "boolean") return value.enabled;
+	return undefined;
+}
+
+async function readEffectiveSetting(cwd: string): Promise<boolean | undefined> {
+	const settings = SettingsManager.create(cwd) as InternalSettingsManager;
+	await settings.reload();
+	return settingValue(settings.settings?.[SETTINGS_KEY]);
+}
+
+async function writeGlobalSetting(cwd: string, enabled: boolean): Promise<string | undefined> {
+	const settings = SettingsManager.create(cwd) as InternalSettingsManager;
+	await settings.reload();
+	if (!settings.globalSettings || !settings.markModified || !settings.save) {
+		return "SettingsManager internals unavailable; setting not persisted.";
+	}
+
+	const previous = isRecord(settings.globalSettings[SETTINGS_KEY]) ? settings.globalSettings[SETTINGS_KEY] : {};
+	settings.globalSettings[SETTINGS_KEY] = { ...previous, enabled };
+	settings.markModified(SETTINGS_KEY);
+	settings.save();
+	await settings.flush();
+
+	const errors = settings.drainErrors();
+	if (errors.length > 0) {
+		return errors.map((error) => `${error.scope}: ${error.error.message}`).join("; ");
+	}
+	return undefined;
+}
+
+function notify(ctx: ExtensionCommandContext, message: string, type: "info" | "warning" | "error" = "info") {
+	if (ctx.hasUI) ctx.ui.notify(message, type);
+}
+
+function isCodexProvider(provider?: string): boolean {
+	return provider?.startsWith(PROVIDER_PREFIX) === true;
+}
+
+function statusText(enabled: boolean, ctx: ExtensionContext): string {
+	if (!enabled) return "Codex fast: off";
+	if (isCodexProvider(ctx.model?.provider)) return "Codex fast: active";
+	return "Codex fast: inactive (applies on Codex)";
+}
+
+function updateStatus(enabled: boolean, ctx: ExtensionContext) {
+	if (!ctx.hasUI) return;
+	ctx.ui.setStatus("codex-fast", statusText(enabled, ctx));
+}
+
+export default function (pi: ExtensionAPI) {
+	let enabled = false;
+
+	pi.registerFlag("fast", {
+		description: "Enable OpenAI Codex priority service tier for this session",
+		type: "boolean",
+		default: false,
+	});
+
+	pi.on("session_start", async (_event, ctx) => {
+		const persisted = await readEffectiveSetting(ctx.cwd);
+		enabled = pi.getFlag("fast") === true || persisted === true;
+		updateStatus(enabled, ctx);
+	});
+
+	pi.on("model_select", (_event, ctx) => {
+		updateStatus(enabled, ctx);
+	});
+
+	pi.on("before_provider_request", (event, ctx) => {
+		if (!enabled) return;
+		if (!isCodexProvider(ctx.model?.provider)) return;
+		if (!isRecord(event.payload)) return;
+		if (Object.prototype.hasOwnProperty.call(event.payload, "service_tier")) return;
+
+		return { ...event.payload, service_tier: "priority" };
+	});
+
+	pi.registerCommand("codex-fast", {
+		description: "Toggle OpenAI Codex priority service tier",
+		getArgumentCompletions: (prefix: string) => {
+			if (prefix.trim().includes(" ")) return [];
+			const items = ["on", "off", "status"].map((value) => ({ value, label: value }));
+			return items.filter((item) => item.value.startsWith(prefix.trim()));
+		},
+		handler: async (args, ctx) => {
+			const arg = args.trim().toLowerCase();
+
+			if (!arg) {
+				enabled = !enabled;
+			} else if (arg === "on") {
+				enabled = true;
+			} else if (arg === "off") {
+				enabled = false;
+			} else if (arg === "status") {
+				updateStatus(enabled, ctx);
+				notify(ctx, statusText(enabled, ctx));
+				return;
+			} else {
+				notify(ctx, "Usage: /codex-fast [on|off|status]", "warning");
+				return;
+			}
+
+			const requested = enabled;
+			const persistError = await writeGlobalSetting(ctx.cwd, requested);
+			const effective = await readEffectiveSetting(ctx.cwd);
+			enabled = effective ?? requested;
+			updateStatus(enabled, ctx);
+
+			const overrideNote = effective !== undefined && effective !== requested ? "\n\nProject settings override the global toggle in this cwd." : "";
+			const message = `${statusText(enabled, ctx)}${overrideNote}${persistError ? `\n\nPersistence warning: ${persistError}` : ""}`;
+			notify(ctx, message, persistError ? "warning" : "info");
+		},
+	});
+}
