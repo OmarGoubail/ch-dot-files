@@ -23,10 +23,10 @@
 
 - [x] Adopt Dannote's core extensions as a coherent package.
 - [x] Adopt Dannote's workflow shortcuts supplied by the package.
-- [ ] Evaluate `plan-mode`.
+- [x] Add `plan-mode` as an optional extension.
 - [ ] Add Dannote Oracle with a safer review context preset.
-- [ ] Evaluate Critic with a cheap model and conservative trigger.
-- [ ] Add rules only after auditing scope/model behavior.
+- [x] Add Critic as an optional extension; configure conservative triggers after runtime testing.
+- [x] Add a small audited set of model-aware rules.
 - [ ] Avoid duplicate websearch tools because `pi-web-access` already covers them.
 
 ## Tools and context
@@ -41,8 +41,8 @@
 
 ## Skills
 
-- [ ] Add Matt Pocock's low-load skill collection.
-- [ ] Enable `grilling`, `tdd`, `code-review`, `diagnosing-bugs`, `research`, and `handoff`.
+- [x] Add selected Matt Pocock skills as local reproducible skills.
+- [x] Add `grilling`, `tdd`, `code-review`, `diagnosing-bugs`, `research`, and `handoff` skills.
 - [ ] Keep architecture/domain skills user-invoked.
 - [ ] Collapse Elixir review into baseline, LiveView, data/deploy, security, testing, memory, and Jump overlays.
 - [ ] Remove or make optional duplicated history, contracts, maintainability, and adversarial lenses.
