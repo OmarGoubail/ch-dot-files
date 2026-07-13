@@ -28,7 +28,9 @@
   "extensions": [
     "git/github.com/dannote/dot-pi/extensions/critic",
     "git/github.com/dannote/dot-pi/extensions/plan-mode",
-    "git/github.com/dannote/dot-pi/extensions/rules"
+    "git/github.com/dannote/dot-pi/extensions/rules",
+    "!git/github.com/dannote/dot-pi/extensions/websearch/**",
+    "!git/github.com/dannote/dot-pi/extensions/webfetch/**"
   ],
   "oracle": {
     "model": "openai-codex-personal/gpt-5.6-sol",
