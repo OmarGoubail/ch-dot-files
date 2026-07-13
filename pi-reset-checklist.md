@@ -51,7 +51,7 @@
 
 - [ ] Enable and test GitHub/external-write guards.
 - [x] Keep `rm-guard`.
-- [x] Add compact commit/review/retry workflows via the Dannote package.
+- [x] Add compact commit/review/retry workflows via the Dannote package and local `/review` prompt.
 - [ ] Keep MCP instructions short and task-scoped.
 - [ ] Test normal coding, exploration, Elixir work, review, Oracle, side questions, and profile switching.
 
