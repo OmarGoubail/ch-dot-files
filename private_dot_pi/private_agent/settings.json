@@ -29,5 +29,45 @@
     "git/github.com/dannote/dot-pi/extensions/critic",
     "git/github.com/dannote/dot-pi/extensions/plan-mode",
     "git/github.com/dannote/dot-pi/extensions/rules"
-  ]
+  ],
+  "oracle": {
+    "model": "openai-codex-personal/gpt-5.6-sol",
+    "thinking": "high",
+    "confirm": true,
+    "defaultIntent": "verify",
+    "tools": "none",
+    "context": {
+      "maxTokens": 18000,
+      "summary": "latest",
+      "keepTailTokens": 6000,
+      "keepUserTurns": 5,
+      "keepAssistantTurns": 4,
+      "drop": {
+        "thinking": true,
+        "toolResults": "errors-and-small",
+        "toolCalls": "names-only",
+        "bashOutput": "truncate",
+        "images": true,
+        "customMessages": true
+      },
+      "truncate": {
+        "toolResultChars": 1600,
+        "bashOutputChars": 1600,
+        "assistantTextChars": 4000
+      }
+    },
+    "budget": {
+      "targetOutputTokens": 2000,
+      "maxTotalUsd": 1
+    },
+    "prompt": {
+      "costWarning": true,
+      "style": "review"
+    },
+    "restore": {
+      "model": true,
+      "thinking": true,
+      "tools": true
+    }
+  }
 }
