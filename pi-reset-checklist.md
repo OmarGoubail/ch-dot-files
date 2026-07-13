@@ -26,7 +26,7 @@
 - [x] Add `plan-mode` as an optional extension.
 - [x] Add Dannote Oracle with a safer review context preset.
 - [x] Add Critic as an optional extension; configure conservative triggers after runtime testing.
-- [x] Add a small audited set of model-aware rules.
+- [x] Add a small audited set of model-aware rules (the only remaining custom system-prompt injection).
 - [x] Avoid duplicate websearch tools because `pi-web-access` already covers them.
 
 ## Tools and context
@@ -52,7 +52,7 @@
 - [ ] Enable and test GitHub/external-write guards.
 - [x] Keep `rm-guard`.
 - [x] Add compact commit/review/retry workflows via the Dannote package and local `/review` prompt.
-- [ ] Keep MCP instructions short and task-scoped.
+- [x] Keep MCP instructions short and task-scoped.
 - [ ] Test normal coding, exploration, Elixir work, review, Oracle, side questions, and profile switching.
 
 ## Verification
