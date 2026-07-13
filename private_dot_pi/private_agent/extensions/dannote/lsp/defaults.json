@@ -144,17 +144,11 @@
     "fileTypes": [".ml", ".mli", ".mll", ".mly"],
     "rootMarkers": ["dune-project", "dune-workspace", "*.opam"]
   },
-  "expert": {
-    "command": "expert",
-    "args": ["--stdio"],
+  "dexter": {
+    "command": "dexter",
+    "args": ["lsp"],
     "fileTypes": [".ex", ".exs", ".heex", ".eex"],
-    "rootMarkers": ["mix.exs", "mix.lock"]
-  },
-  "elixirls": {
-    "command": "elixir-ls",
-    "args": [],
-    "fileTypes": [".ex", ".exs", ".heex", ".eex"],
-    "rootMarkers": ["mix.exs", "mix.lock"]
+    "rootMarkers": [".dexter/dexter.db", ".dexter.db", "mix.exs", "mix.lock"]
   },
   "gleam": {
     "command": "gleam",
