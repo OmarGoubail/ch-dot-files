@@ -194,7 +194,7 @@ function usage(): string {
 		"  2. /elixir-review init",
 		"     Run once per machine/repo to create ~/.pi/review-memory plus a central repo bucket under ~/.pi/review-memory/repos/<repo>.",
 		"  3. /elixir-review prompt current changes",
-		"     Puts a ready review request in the editor. Submit it to make the orchestrator run focused reviewer subagents with the Elixir skills.",
+		"     Puts a ready review request in the editor. Submit it to run a focused reviewer with the Elixir skills.",
 		"  4. /elixir-review learn PR-1234",
 		"     After human feedback, put a learning prompt in the editor that may persist durable review-memory entries.",
 		"",
@@ -229,72 +229,79 @@ function reviewPrompt(scope = "current changes"): string {
 	const prNumber = prMatch?.[1];
 	const scopeInstructions = prNumber
 		? `PR NUMBER MODE — do not assume the current branch is PR ${prNumber}.
-
+\n
 First resolve the PR with read-only GitHub CLI commands, including human review context:
-
+\n
 \`\`\`bash
-gh pr view ${prNumber} --json number,title,body,baseRefName,headRefName,headRepositoryOwner,headRepository,state,url,author,additions,deletions,changedFiles,reviews,comments > /tmp/pi-elixir-review/pr-${prNumber}-meta.json
 mkdir -p /tmp/pi-elixir-review
+gh pr view ${prNumber} --json number,title,body,baseRefName,headRefName,headRepositoryOwner,headRepository,state,url,author,additions,deletions,changedFiles,reviews,comments > /tmp/pi-elixir-review/pr-${prNumber}-meta.json
 gh pr diff ${prNumber} > /tmp/pi-elixir-review/pr-${prNumber}.patch
 gh pr diff ${prNumber} --name-only > /tmp/pi-elixir-review/pr-${prNumber}-files.txt
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 gh api "repos/$REPO/pulls/${prNumber}/comments" --paginate > /tmp/pi-elixir-review/pr-${prNumber}-review-comments.json
 gh api "repos/$REPO/issues/${prNumber}/comments" --paginate > /tmp/pi-elixir-review/pr-${prNumber}-issue-comments.json
 \`\`\`
-
-Before launching reviewers, read human reviews/comments from those JSON files. Human reviewer comments are first-class review context: if a human explicitly asks for tests/changes, surface it in the final review as "Human review context" even if your reviewers classify it as non-blocking. Do not let subagents bury human comments as residual risks.
-
-Then compare PR metadata to the current worktree:
-
+\n
+Read the human reviews and comments before reviewing. They are first-class context: surface explicit requests for tests or changes under Human review context, even when non-blocking.
+\n
+Compare the PR metadata with the current worktree:
+\n
 \`\`\`bash
 git branch --show-current
 git rev-parse --show-toplevel
 git status --short
 git diff --name-only main...HEAD || true
 \`\`\`
-
-If the checked-out branch/head does not match PR ${prNumber}, review the PR diff from \`/tmp/pi-elixir-review/pr-${prNumber}.patch\` and say that local test execution may require checking out the PR branch. Do not silently review \`main...HEAD\` as a substitute for PR ${prNumber}. If you need local execution, ask before checking out or mutating the worktree.`
-		: `CURRENT-CHANGES MODE — review the checked-out worktree diff. State the branch and diff range you used, usually \`git diff main...HEAD\` plus uncommitted changes if present.`;
-
+\n
+If the checked-out branch/head does not match PR ${prNumber}, use /tmp/pi-elixir-review/pr-${prNumber}.patch as the source of truth and state that local checks may be skipped. Never silently substitute main...HEAD for the PR. Ask before checking out or mutating the worktree.`
+		: `CURRENT-CHANGES MODE — inspect the checked-out worktree. State the branch and exact diff range, normally \`git diff main...HEAD\` plus uncommitted changes if present.`;
 	return `Review ${scope} as an Elixir/Phoenix PR review.
-
+\n
 ${scopeInstructions}
-
-Use the orchestrator review flow: first run a cheap scout/blast-radius pass, then launch the right number of focused reviewer subagents. Every scout/reviewer task must state the exact source of truth it is inspecting: PR patch path, PR number/base/head, or local diff range.
-
-Preflight scout pass:
-- Launch one low-effort scout before reviewers.
-- Scout reads the resolved PR patch/file list or local diff plus human PR reviews/comments when present, and reports: changed files, additions/deletions, domains touched (LiveView/HEEx/components, Ecto/schema/migration/query/context, tests, auth/security, jobs/runtime/deploy/config, logging/metadata, prompt/execution paths, defensive normalization, docs-only), human-requested changes, likely Jump signals, suggested skills, recommended fanout/concurrency, and required repo check commands from AGENTS/CLAUDE/mix aliases/CI.
-- Scout must not review correctness deeply; it only maps blast radius, discovers local check commands, and proposes review lenses.
-
-Example scout:
-
-subagent({ agent: "scout", task: "Map the blast radius for the resolved PR/local diff source of truth. Read repo instructions such as AGENTS.md/CLAUDE.md and mix.exs aliases. Report changed file categories, size, logging/metadata, prompt/execution, defensive-normalization risk areas, required check commands such as mix jump.ci.lint/credo/targeted tests when present, suggested review skills, and recommended reviewer fanout/concurrency. Do not perform deep review." })
-
-Fanout guidance, using scout output plus additions+deletions, changed files, and risk:
-- Tiny/trivial (<150 changed lines, docs/copy/simple tests): usually no subagent or 1 reviewer with elixir-pr-review and elixir-review-memory.
-- Small (150-350 lines, low-risk single area): 1-2 reviewers, concurrency 1-2.
-- Medium (350-800 lines or 2-3 areas such as LiveView + tests): 3-4 focused reviewers, concurrency 3-4.
-- Large/risky (800+ lines, migrations, auth/security, background jobs, deploy/runtime risk, many files, or unclear ownership): 5-6 focused reviewers, concurrency 5-6, plus adversarial when warranted.
-
-Choose lenses by changed files and risk; do not run all reviewers by default. Example for a medium/large Elixir PR:
-
-subagent({ tasks: [
-  { agent: "reviewer", task: "Coordinator/baseline review of the resolved PR/local diff source of truth for correctness, regressions, and missing checks using elixir-pr-review and elixir-review-memory. Do not substitute current branch diff for a PR number unless verified.", skill: "elixir-pr-review,elixir-review-memory" },
-  { agent: "reviewer", task: "LiveView/HEEx/component review of the same source of truth. Focus on assigns, hooks, components, forms, async, and Jump UI conventions if applicable.", skill: "elixir-liveview-review,jump-elixir-review,elixir-review-memory" },
-  { agent: "reviewer", task: "Ecto/data/deploy review of the same source of truth. Focus on schemas, changesets, queries, migrations, transactions, rolling deploys, and runtime safety.", skill: "elixir-ecto-review,elixir-deploy-risk-review,elixir-review-memory" },
-  { agent: "reviewer", task: "Security/authorization review of the same source of truth. Focus on tenant/account scoping, LiveView permissions, IDOR, injection, XSS, secrets, structured logging metadata, uploads, and redirects.", skill: "elixir-security-review,jump-elixir-review,elixir-review-memory" },
-  { agent: "reviewer", task: "Testing/contracts review of the same source of truth plus human review comments. Focus on PhoenixTest/ExUnit patterns, async safety, assertions, public contracts, specs, routes, documented behavior, logging metadata shape contracts, and any human-requested coverage gaps.", skill: "elixir-testing-review,elixir-code-contracts-review,jump-elixir-review,elixir-review-memory" },
-  { agent: "reviewer", task: "Maintainability/contracts/logging review of the same source of truth when scout flags logging metadata builders, prompt/execution paths, or defensive normalization. Focus on strict core contracts, broad fallbacks, structured metadata, pure/cheap/gated payload construction, helper reuse boundaries, and hidden side effects.", skill: "elixir-maintainability-review,elixir-code-contracts-review,elixir-security-review,elixir-review-memory" }
-], concurrency: 5 })
-
-Select only relevant skills from: elixir-pr-review, elixir-liveview-review, elixir-ecto-review, elixir-testing-review, elixir-security-review, elixir-deploy-risk-review, elixir-maintainability-review, elixir-code-contracts-review, elixir-git-history-review, elixir-prior-comments-review, elixir-adversarial-review, jump-elixir-review, elixir-review-memory. For PR-number reviews, include elixir-prior-comments-review whenever human comments/reviews exist. Add elixir-maintainability-review and elixir-code-contracts-review when changes touch logging metadata builders, prompt/execution paths, defensive normalization, broad fallbacks, or public specs; add elixir-security-review and/or elixir-adversarial-review when those paths involve side effects, persisted logs, sensitive data, large/risky scope, or deploy-sensitive behavior. Add elixir-git-history-review when history/blame matters.
-
-Checks requirements: before finalizing, reviewers must read repo instructions and discovered check aliases/scripts. Run required repo checks such as mix jump.ci.lint, Credo, format checks, compile, and targeted tests for changed files when available and safe. If a PR is not checked out locally, either run patch-only review and explicitly mark local checks skipped, or ask before creating/checking out a worktree to run the exact PR checks. The final review must list every required check as passed/failed/skipped with reason.
-
-Memory requirements: read global memory at ~/.pi/review-memory/patterns.md and repo-specific memory at ~/.pi/review-memory/repos/<current-repo>/patterns.md if present; apply memory as a verification lens, not as proof. Do not write review memory during ordinary reviews unless the user explicitly requests persistence. In the final review, state whether memory was consulted.
-
-Output all verified findings, split by severity, with exact file:line references. Use path:line or path:start-end for every blocking and non-blocking finding whenever possible; derive line numbers from patch hunks, nl -ba, rg -n, or test output. If no stable line exists, write line unknown and explain why. Include a "Reviewed source" line that says exactly whether you reviewed PR ${prNumber || "<none>"} via gh diff, a checked-out matching branch, or local current changes. Each reviewer must include a "Review lens" section stating assigned lens, what issue classes it looked for, and what was out of scope, so the parent can synthesize coverage without re-reading artifacts. Include a "Review evidence" section listing source inspected, instructions/config read, local patterns checked, facts verified true, and important checks not verified. Include separate sections for "Blocking findings" and "Non-blocking findings"; do not suppress advisory findings, coverage gaps, human-requested changes, or medium/low risks just because they do not block approval. Include a "Human review context" section summarizing unresolved human reviewer comments and whether this review agrees, disagrees, or could not verify. If there are no findings in a section, say "None".`;
+\n
+Delegate the review to one reviewer by default:
+\n
+subagent({ agent: "reviewer", task: "Inspect the exact PR patch/source or local diff above. Read repository instructions (AGENTS.md, CLAUDE.md, and equivalent), mix.exs aliases, CI/check scripts, and relevant code. Run safe, relevant project-native checks and report every verified finding with evidence. Select focused skills only when changed files require them; do not review unrelated domains.", skill: "elixir-pr-review,elixir-review-memory" })
+\n
+Use at most two reviewer tasks only when the diff clearly crosses independent domains or is security-, data-, or deploy-sensitive. If a second task is warranted, give it one focused lens and the same source of truth; do not fan out automatically. Available focused skills include elixir-liveview-review, elixir-ecto-review, elixir-testing-review, elixir-security-review, elixir-deploy-risk-review, elixir-maintainability-review, elixir-code-contracts-review, elixir-git-history-review, elixir-prior-comments-review, elixir-adversarial-review, and jump-elixir-review. Add only skills justified by changed files/risk (including prior-comments when human comments need focused review).
+\n
+Checks: read repo instructions and discovered aliases/scripts first. Run required and relevant native checks (for example format, compile, Credo, mix jump.ci.lint, and targeted tests) when available and safe. For a PR patch not checked out locally, use patch-only review and mark local checks skipped, or ask before creating/checking out a worktree. List every relevant check as passed, failed, or skipped with its reason.
+\n
+Memory: read ~/.pi/review-memory/patterns.md and ~/.pi/review-memory/repos/<current-repo>/patterns.md when present via review_memory read. Treat memory as a verification lens, not proof. Ordinary reviews are read-only: do not call append_pattern or write_reflection. Those writes require explicit /elixir-review learn (or another explicit persistence request). State whether memory was consulted.
+\n
+Return one consolidated review with exact file:line or file:start-end references whenever possible; derive patch-only locations from hunks. Do not suppress verified advisory findings, coverage gaps, or human-requested changes. If a location is unstable, use line unknown and explain why. Use this format:
+\n
+Reviewed source: <PR via gh diff | checked-out matching PR branch | local diff range>
+Verdict: <Approved | Changes requested>
+\n
+Review lens:
+- Assigned lens: <baseline and any focused lens>
+- Looked for: <issue classes checked>
+- Out of scope: <areas not required by changed files>
+\n
+Review evidence:
+- Source inspected: <patch/files/diff range>
+- Instructions/config read: <repo guidance, aliases, CI>
+- Local patterns checked: <relevant conventions>
+- Verified true: <established facts>
+- Not verified: <important checks skipped and why>
+\n
+Checks:
+- <command with cwd> — pass/fail/skipped and why
+\n
+Blocking findings:
+- [blocking] path/to/file.ex:42 — <verified issue, impact, and minimal fix>.
+- None.
+\n
+Non-blocking findings:
+- [medium|low|info] path/to/file.ex:42 — <advisory issue, coverage gap, human-requested change, or risk>.
+- None.
+\n
+Human review context:
+- <unresolved human comments and whether this review agrees, disagrees, or could not verify>
+\n
+Memory: <consulted or not present>
+Residual risks: <meaningful risks not captured above, or none>`;
 }
 
 function slugify(input: string): string {
