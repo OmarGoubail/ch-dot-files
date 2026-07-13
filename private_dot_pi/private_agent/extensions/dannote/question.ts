@@ -6,6 +6,7 @@
 
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
 import { Editor, type EditorTheme, Key, matchesKey, truncateToWidth } from '@earendil-works/pi-tui'
+import { withHerdrBlocked } from './shared/herdr'
 import { firstText, renderLines, renderToolCall, toolError, toolText } from './shared/render'
 import { Type } from 'typebox'
 
@@ -72,7 +73,8 @@ export default function question(pi: ExtensionAPI) {
         { label: 'Type something.', isOther: true }
       ]
 
-      const result = await ctx.ui.custom<{
+      const result = await withHerdrBlocked(pi, 'Question', () =>
+        ctx.ui.custom<{
         answer: string
         wasCustom: boolean
         index?: number
@@ -206,7 +208,8 @@ export default function question(pi: ExtensionAPI) {
           },
           handleInput
         }
-      })
+        })
+      )
 
       // Build simple options list for details
       const simpleOptions = params.options.map((o) => o.label)

@@ -1,1 +1,1 @@
-Prefer `rg` over `grep` — faster, respects `.gitignore`.
+Use Pi's `grep` and `find` tools for repository search. Do not invoke `rg`, `grep`, `fd`, or `find` through `bash` unless the user explicitly requests a shell command or the Pi search tools are unavailable.

@@ -5,6 +5,8 @@
  * session actions that need explicit user approval.
  */
 
+import { lstatSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type {
   ExtensionAPI,
   SessionBeforeSwitchEvent,
@@ -21,12 +23,13 @@ import {
 } from 'unbash'
 import { notifyDesktop } from './shared/desktop-notify'
 import { formatPiNotificationTitle } from './shared/project-name'
+import { withHerdrBlocked } from './shared/herdr'
 import { readLayeredSettings } from './shared/settings'
 
 export type CommandRule = {
   argv: string[]
   label: string
-  matches?: (argv: string[]) => boolean
+  matches?: (argv: string[], cwd: string) => boolean
 }
 
 const GITHUB_RULES: CommandRule[] = [
@@ -75,10 +78,13 @@ const TWITTER_RULES: CommandRule[] = [
 const GIT_RULES: CommandRule[] = [
   matched(['git'], 'Force push', isGitForcePush),
   matched(['git'], 'Delete remote branch', isGitRemoteBranchDelete),
-  matched(['git'], 'Push git commits', isGitPush),
   matched(['git'], 'Hard reset', isGitHardReset),
   matched(['git'], 'Clean working tree', isGitForcedClean),
-  matched(['git'], 'Delete local branch', isGitBranchDelete)
+  matched(['git'], 'Force-delete local branch', isGitBranchDelete)
+]
+
+const FILESYSTEM_RULES: CommandRule[] = [
+  matched(['rm'], 'Broad recursive removal', isBroadRecursiveRemoval)
 ]
 
 const PACKAGE_PUBLISH_RULES: CommandRule[] = [
@@ -114,6 +120,7 @@ const RULE_GROUPS = {
   gmail: GMAIL_RULES,
   twitter: TWITTER_RULES,
   git: GIT_RULES,
+  filesystem: FILESYSTEM_RULES,
   publish: PACKAGE_PUBLISH_RULES,
   deploy: DEPLOY_RULES,
   execution: EXECUTION_SURFACE_RULES
@@ -162,7 +169,7 @@ export default function (pi: ExtensionAPI) {
     if (!isToolCallEventType('bash', event)) return
 
     const command = event.input.command
-    const match = matchCommandRule(command, commandRules)
+    const match = matchCommandRule(command, commandRules, ctx.cwd)
     if (!match) return
 
     if (!ctx.hasUI) {
@@ -171,9 +178,8 @@ export default function (pi: ExtensionAPI) {
 
     notifyDesktop(notificationTitle(ctx.cwd), `Approve: ${match.label}`)
 
-    const confirmed = await ctx.ui.confirm(
-      `${match.label}?`,
-      'Review the command before submitting.'
+    const confirmed = await withHerdrBlocked(pi, match.label, () =>
+      ctx.ui.confirm(`${match.label}?`, 'Review the command before submitting.')
     )
 
     if (!confirmed) {
@@ -188,9 +194,8 @@ export default function (pi: ExtensionAPI) {
     if (event.reason === 'new') {
       notifyDesktop(notificationTitle(ctx.cwd), 'Approve: clear current session')
 
-      const confirmed = await ctx.ui.confirm(
-        'Clear session?',
-        'This will delete all messages in the current session.'
+      const confirmed = await withHerdrBlocked(pi, 'Clear session', () =>
+        ctx.ui.confirm('Clear session?', 'This will delete all messages in the current session.')
       )
 
       if (!confirmed) {
@@ -208,9 +213,8 @@ export default function (pi: ExtensionAPI) {
     if (hasUnsavedWork) {
       notifyDesktop(notificationTitle(ctx.cwd), 'Approve: switch session')
 
-      const confirmed = await ctx.ui.confirm(
-        'Switch session?',
-        'You have messages in the current session. Switch anyway?'
+      const confirmed = await withHerdrBlocked(pi, 'Switch session', () =>
+        ctx.ui.confirm('Switch session?', 'You have messages in the current session. Switch anyway?')
       )
 
       if (!confirmed) {
@@ -225,10 +229,12 @@ export default function (pi: ExtensionAPI) {
 
     notifyDesktop(notificationTitle(ctx.cwd), `Approve: fork from ${event.entryId.slice(0, 8)}`)
 
-    const choice = await ctx.ui.select(`Fork from entry ${event.entryId.slice(0, 8)}?`, [
-      'Yes, create fork',
-      'No, stay in current session'
-    ])
+    const choice = await withHerdrBlocked(pi, `Fork from entry ${event.entryId.slice(0, 8)}`, () =>
+      ctx.ui.select(`Fork from entry ${event.entryId.slice(0, 8)}?`, [
+        'Yes, create fork',
+        'No, stay in current session'
+      ])
+    )
 
     if (choice !== 'Yes, create fork') {
       ctx.ui.notify('Fork cancelled', 'info')
@@ -237,7 +243,11 @@ export default function (pi: ExtensionAPI) {
   })
 }
 
-export function matchCommandRule(command: string, rules: CommandRule[]): CommandRule | undefined {
+export function matchCommandRule(
+  command: string,
+  rules: CommandRule[],
+  cwd = process.cwd()
+): CommandRule | undefined {
   const parsed = parseCommand(command)
   if (parsed.parseFailed) return PARSE_ERROR_RULE
 
@@ -245,7 +255,7 @@ export function matchCommandRule(command: string, rules: CommandRule[]): Command
     const normalized = normalizeInvocation(invocation.argv)
     const match = rules.find((rule) => {
       const comparable = normalizeToolInvocation(normalized, rule.argv)
-      return startsWithArgv(comparable, rule.argv) && (rule.matches?.(comparable) ?? true)
+      return startsWithArgv(comparable, rule.argv) && (rule.matches?.(comparable, cwd) ?? true)
     })
     if (match) return match
 
@@ -626,10 +636,6 @@ function isGitRemoteBranchDelete(argv: string[]): boolean {
   )
 }
 
-function isGitPush(argv: string[]): boolean {
-  return getGitSubcommand(argv) === 'push'
-}
-
 function isGitHardReset(argv: string[]): boolean {
   return getGitSubcommand(argv) === 'reset' && hasAnyFlag(argv, ['--hard'])
 }
@@ -639,7 +645,46 @@ function isGitForcedClean(argv: string[]): boolean {
 }
 
 function isGitBranchDelete(argv: string[]): boolean {
-  return getGitSubcommand(argv) === 'branch' && hasAnyFlag(argv, ['-d', '-D', '--delete'])
+  return getGitSubcommand(argv) === 'branch' && hasAnyFlag(argv, ['-D'])
+}
+
+function isBroadRecursiveRemoval(argv: string[], cwd: string): boolean {
+  if (argv[0] !== 'rm') return false
+
+  let parsingOptions = true
+  let recursive = false
+  const targets: string[] = []
+
+  for (const arg of argv.slice(1)) {
+    if (parsingOptions && arg === '--') {
+      parsingOptions = false
+      continue
+    }
+
+    if (parsingOptions && arg.startsWith('-') && arg !== '-') {
+      if (arg === '--recursive' || /^-[^-]*r/i.test(arg)) recursive = true
+      continue
+    }
+
+    targets.push(arg)
+  }
+
+  return recursive && targets.some((target) => isBroadRemovalTarget(target, cwd))
+}
+
+function isBroadRemovalTarget(target: string, cwd: string): boolean {
+  if (['/', '~', '~/', '.', './', '..', '../'].includes(target)) return true
+  if (/[?*{}\[\]]/.test(target) || target.endsWith('/') || /[$`]/.test(target)) return true
+
+  const resolvedTarget = target.startsWith('~/') && process.env.HOME
+    ? resolve(process.env.HOME, target.slice(2))
+    : resolve(cwd, target)
+
+  try {
+    return lstatSync(resolvedTarget).isDirectory()
+  } catch {
+    return false
+  }
 }
 
 function isShellCommandString(argv: string[]): boolean {

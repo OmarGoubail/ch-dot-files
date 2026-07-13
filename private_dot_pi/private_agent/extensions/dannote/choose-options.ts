@@ -8,6 +8,7 @@ import {
   truncateToWidth,
   wrapTextWithAnsi
 } from '@earendil-works/pi-tui'
+import { withHerdrBlocked } from './shared/herdr'
 import { renderLines, toolText } from './shared/render'
 import { Type } from 'typebox'
 
@@ -100,16 +101,18 @@ export default function chooseOptions(pi: ExtensionAPI) {
         actions.indexOf(params.defaultAction ?? actions[0] ?? '')
       )
 
-      const result = await runNativeEditorChooser(
-        {
-          question: params.question,
-          options,
-          actions,
-          allowMultiple: params.allowMultiple !== false,
-          defaultActionIndex
-        },
-        ctx,
-        signal
+      const result = await withHerdrBlocked(pi, 'Choose options', () =>
+        runNativeEditorChooser(
+          {
+            question: params.question,
+            options,
+            actions,
+            allowMultiple: params.allowMultiple !== false,
+            defaultActionIndex
+          },
+          ctx,
+          signal
+        )
       )
 
       return toolText(formatChoiceResult(result), result)

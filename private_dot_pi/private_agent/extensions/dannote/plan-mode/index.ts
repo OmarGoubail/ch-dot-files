@@ -14,6 +14,7 @@ import type { AssistantMessage, TextContent } from '@earendil-works/pi-ai'
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent'
 import { Key } from '@earendil-works/pi-tui'
 
+import { withHerdrBlocked } from '../shared/herdr'
 import { extractTodoItems, isSafeCommand, markCompletedSteps, type TodoItem } from './utils.js'
 
 const PLAN_MODE_TOOLS = ['read', 'bash', 'grep', 'find', 'ls', 'questionnaire']
@@ -210,11 +211,13 @@ export default function planModeExtension(pi: ExtensionAPI): void {
       if (extracted.length > 0) todoItems = extracted
     }
 
-    const choice = await ctx.ui.select('Plan mode - what next?', [
-      todoItems.length > 0 ? 'Execute the plan (track progress)' : 'Execute the plan',
-      'Stay in plan mode',
-      'Refine the plan'
-    ])
+    const choice = await withHerdrBlocked(pi, 'Plan mode - what next?', () =>
+      ctx.ui.select('Plan mode - what next?', [
+        todoItems.length > 0 ? 'Execute the plan (track progress)' : 'Execute the plan',
+        'Stay in plan mode',
+        'Refine the plan'
+      ])
+    )
 
     if (choice?.startsWith('Execute')) {
       planModeEnabled = false
@@ -231,7 +234,9 @@ export default function planModeExtension(pi: ExtensionAPI): void {
         { triggerTurn: true }
       )
     } else if (choice === 'Refine the plan') {
-      const refinement = await ctx.ui.editor('Refine the plan:', '')
+      const refinement = await withHerdrBlocked(pi, 'Refine the plan', () =>
+        ctx.ui.editor('Refine the plan:', '')
+      )
       if (refinement?.trim()) pi.sendUserMessage(refinement.trim())
     }
   })
