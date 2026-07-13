@@ -24,5 +24,10 @@
   "subagents": {
     "disableBuiltins": false
   },
-  "theme": "theme-current"
+  "theme": "theme-current",
+  "extensions": [
+    "git/github.com/dannote/dot-pi/extensions/critic",
+    "git/github.com/dannote/dot-pi/extensions/plan-mode",
+    "git/github.com/dannote/dot-pi/extensions/rules"
+  ]
 }
