@@ -24,7 +24,7 @@
 - [x] Adopt Dannote's core extensions as a coherent package.
 - [x] Adopt Dannote's workflow shortcuts supplied by the package.
 - [x] Add `plan-mode` as an optional extension.
-- [ ] Add Dannote Oracle with a safer review context preset.
+- [x] Add Dannote Oracle with a safer review context preset.
 - [x] Add Critic as an optional extension; configure conservative triggers after runtime testing.
 - [x] Add a small audited set of model-aware rules.
 - [ ] Avoid duplicate websearch tools because `pi-web-access` already covers them.
