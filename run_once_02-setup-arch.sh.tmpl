@@ -1,21 +1,68 @@
-{{- if not (eq .chezmoi.osRelease.id "arch") -}}
+{{- $isArchLike := and (eq .chezmoi.os "linux") (hasKey .chezmoi.osRelease "id") (or (eq .chezmoi.osRelease.id "arch") (eq .chezmoi.osRelease.id "cachyos")) -}}
+{{- if not $isArchLike -}}
 #!/bin/sh
 exit 0
 {{- else -}}
 #!/bin/bash
 set -euo pipefail
 
-echo "==> Setting up Arch desktop..."
+echo "==> Setting up Arch-like desktop..."
 
-# Install fish if not present
-if ! command -v fish &>/dev/null; then
-    echo "==> Installing fish..."
-    sudo pacman -S --needed --noconfirm fish
+pacman_packages=(
+    base-devel
+    git
+    curl
+)
+
+yay_packages=(
+    fish
+    curl
+    wget
+    unzip
+    make
+    tmux
+    ripgrep
+    fd
+    bat
+    btop
+    fzf
+    jq
+    htop
+    lsof
+    eza
+    zoxide
+    neovim
+    lazygit
+    starship
+    atuin
+    ghostty
+    herdr-bin
+    hunk-bin
+    zellij
+    git-delta
+    uv
+    zed
+)
+
+echo "==> Installing yay bootstrap packages..."
+sudo pacman -S --needed --noconfirm "${pacman_packages[@]}"
+
+if ! command -v yay &>/dev/null; then
+    echo "==> Installing yay from AUR snapshot..."
+    tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' EXIT
+    curl -fsSL "https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz" -o "$tmpdir/yay-bin.tar.gz"
+    tar -xzf "$tmpdir/yay-bin.tar.gz" -C "$tmpdir"
+    (cd "$tmpdir/yay-bin" && makepkg -si --noconfirm)
 fi
+
+echo "==> Installing desktop/dev packages with yay..."
+yay -S --needed --noconfirm "${yay_packages[@]}"
 
 # Set fish as default shell
 FISH_PATH=$(command -v fish)
-if [ "$SHELL" != "$FISH_PATH" ]; then
+CURRENT_SHELL=$(getent passwd "$(whoami)" | cut -d: -f7)
+if [ "$(readlink -f "$CURRENT_SHELL")" != "$(readlink -f "$FISH_PATH")" ]; then
     echo "==> Setting fish as default shell..."
     if ! grep -q "^$FISH_PATH$" /etc/shells 2>/dev/null; then
         echo "$FISH_PATH" | sudo tee -a /etc/shells >/dev/null
@@ -23,5 +70,5 @@ if [ "$SHELL" != "$FISH_PATH" ]; then
     sudo chsh -s "$FISH_PATH" "$(whoami)"
 fi
 
-echo "==> Arch desktop setup complete."
+echo "==> Arch-like desktop setup complete."
 {{- end }}
