@@ -25,8 +25,6 @@
   },
   "theme": "theme-current",
   "extensions": [
-    "!git/github.com/dannote/dot-pi/extensions/websearch/**",
-    "!git/github.com/dannote/dot-pi/extensions/webfetch/**",
     "extensions/dannote"
   ],
   "oracle": {
