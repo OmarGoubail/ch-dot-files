@@ -1,6 +1,6 @@
 {
   "provider": "exa",
   "workflow": "none",
-  "searchModel": "gemini-2.5-flash",
+  "searchModel": "opencode-go/deepseek-v4-flash",
   "curatorTimeoutSeconds": 30
 }
