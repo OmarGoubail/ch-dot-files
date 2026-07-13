@@ -44,8 +44,8 @@
 - [x] Add selected Matt Pocock skills as local reproducible skills.
 - [x] Add `grilling`, `tdd`, `code-review`, `diagnosing-bugs`, `research`, and `handoff` skills.
 - [x] Keep architecture/domain skills user-invoked.
-- [ ] Collapse Elixir review into baseline, LiveView, data/deploy, security, testing, memory, and Jump overlays.
-- [ ] Remove or make optional duplicated history, contracts, maintainability, and adversarial lenses.
+- [x] Collapse Elixir review into `elixir-pr-review` with internal baseline correctness, Phoenix/LiveView, data/deploy, testing, security, contracts/maintainability/history, and Jump routing sections; retain memory and code-quality helpers.
+- [x] Remove redundant focused Elixir review skills; use `jump-elixir-review` only as the optional Jump overlay.
 
 ## Safety and workflows
 

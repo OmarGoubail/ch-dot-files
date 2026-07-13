@@ -261,9 +261,9 @@ ${scopeInstructions}
 \n
 Delegate the review to one reviewer by default:
 \n
-subagent({ agent: "reviewer", task: "Inspect the exact PR patch/source or local diff above. Read repository instructions (AGENTS.md, CLAUDE.md, and equivalent), mix.exs aliases, CI/check scripts, and relevant code. Run safe, relevant project-native checks and report every verified finding with evidence. Select focused skills only when changed files require them; do not review unrelated domains.", skill: "elixir-pr-review,elixir-review-memory" })
+subagent({ agent: "reviewer", task: "Inspect the exact PR patch/source or local diff above. Read repository instructions (AGENTS.md, CLAUDE.md, and equivalent), mix.exs aliases, CI/check scripts, and relevant code. Run safe, relevant project-native checks and report every verified finding with evidence. Use the baseline Elixir review skill and read-only review memory; route Jump-specific checks only when the repository is verified as Jump.", skill: "elixir-pr-review,elixir-review-memory" })
 \n
-Use at most two reviewer tasks only when the diff clearly crosses independent domains or is security-, data-, or deploy-sensitive. If a second task is warranted, give it one focused lens and the same source of truth; do not fan out automatically. Available focused skills include elixir-liveview-review, elixir-ecto-review, elixir-testing-review, elixir-security-review, elixir-deploy-risk-review, elixir-maintainability-review, elixir-code-contracts-review, elixir-git-history-review, elixir-prior-comments-review, elixir-adversarial-review, and jump-elixir-review. Add only skills justified by changed files/risk (including prior-comments when human comments need focused review).
+Use one reviewer by default. Add an optional second reviewer only when independent high-risk coverage is warranted by security-, data-, deploy-, or otherwise materially risky behavior; give it the same source of truth and use only the baseline skill plus read-only memory, adding jump-elixir-review only for a verified Jump repo. Do not fan out automatically.
 \n
 Checks: read repo instructions and discovered aliases/scripts first. Run required and relevant native checks (for example format, compile, Credo, mix jump.ci.lint, and targeted tests) when available and safe. For a PR patch not checked out locally, use patch-only review and mark local checks skipped, or ask before creating/checking out a worktree. List every relevant check as passed, failed, or skipped with its reason.
 \n
@@ -327,7 +327,7 @@ function reflectionTemplate(label: string): string {
 ## Future Review Pattern
 - Rule: <one sentence>
 - Detection: <how to find it next time>
-- Skill: <elixir-pr-review|elixir-liveview-review|elixir-ecto-review|elixir-testing-review|elixir-security-review|jump-elixir-review>
+- Skill: <elixir-pr-review|elixir-review-memory|jump-elixir-review>
 
 ## Sources
 - <reviewer/comment/file links or local references>
