@@ -1,7 +1,7 @@
 /**
  * Pi account profiles.
  *
- * ~/.pi/agent/profiles.yaml contains account-level model and thinking policy.
+ * ~/.pi/agent/profiles.json contains account-level model and thinking policy.
  * This extension deliberately does not load prompts or alter the system prompt.
  */
 
@@ -32,7 +32,7 @@ type ModelSpec = {
 	id: string;
 };
 
-const CONFIG_PATH = join(homedir(), ".pi", "agent", "profiles.yaml");
+const CONFIG_PATH = join(homedir(), ".pi", "agent", "profiles.json");
 const THINKING_LEVELS = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -61,51 +61,6 @@ function asPolicy(value: unknown, label: string, warnings: string[]): ModelPolic
 	return policy;
 }
 
-function stripComment(value: string): string {
-	let quote: string | undefined;
-	for (let index = 0; index < value.length; index++) {
-		const character = value[index];
-		if (quote) {
-			if (character === quote) quote = undefined;
-			continue;
-		}
-		if (character === "\"" || character === "'") quote = character;
-		else if (character === "#" && (index === 0 || /\s/.test(value[index - 1] || ""))) return value.slice(0, index).trimEnd();
-	}
-	return value.trimEnd();
-}
-
-function scalar(value: string): string {
-	const trimmed = stripComment(value.trim());
-	if (trimmed.length >= 2 && ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
-		return trimmed.slice(1, -1);
-	}
-	return trimmed;
-}
-
-function parseCompactYaml(raw: string): JsonRecord {
-	const root: JsonRecord = {};
-	const stack: Array<{ indent: number; value: JsonRecord }> = [{ indent: -1, value: root }];
-	for (const line of raw.split(/\r?\n/)) {
-		if (!line.trim() || line.trimStart().startsWith("#")) continue;
-		const indent = line.search(/\S/);
-		const content = stripComment(line.trim());
-		const separator = content.indexOf(":");
-		if (separator <= 0) continue;
-		const key = scalar(content.slice(0, separator));
-		const value = content.slice(separator + 1).trim();
-		while (stack.length > 1 && indent <= stack[stack.length - 1]!.indent) stack.pop();
-		const parent = stack[stack.length - 1]!.value;
-		if (value) parent[key] = scalar(value);
-		else {
-			const child: JsonRecord = {};
-			parent[key] = child;
-			stack.push({ indent, value: child });
-		}
-	}
-	return root;
-}
-
 function readProfiles(): { config: ProfilesFile; warnings: string[] } {
 	const warnings: string[] = [];
 	if (!existsSync(CONFIG_PATH)) {
@@ -113,7 +68,7 @@ function readProfiles(): { config: ProfilesFile; warnings: string[] } {
 	}
 
 	try {
-		const parsed = parseCompactYaml(readFileSync(CONFIG_PATH, "utf8"));
+		const parsed = JSON.parse(readFileSync(CONFIG_PATH, "utf8")) as JsonRecord;
 		const profiles: Record<string, Profile> = {};
 		if (parsed.profiles !== undefined && !isRecord(parsed.profiles)) {
 			warnings.push("profiles must be a mapping.");
@@ -319,7 +274,7 @@ export default function profiles(pi: ExtensionAPI): void {
 	});
 
 	pi.registerCommand("profile", {
-		description: "Switch account profile, inspect status, or reload profiles.yaml",
+		description: "Switch account profile, inspect status, or reload profiles.json",
 		getArgumentCompletions: (prefix: string) => {
 			const items = ["status", "reload", ...profileNames()];
 			const trimmed = prefix.trim();
