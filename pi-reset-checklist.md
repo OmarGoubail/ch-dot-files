@@ -4,7 +4,7 @@
 
 - [x] Start normal sessions with the configured active account profile.
 - [x] Remove the presentation-only Snake extension.
-- [ ] Commit a clean baseline before the larger reset.
+- [x] Commit a clean baseline before the larger reset.
 - [x] Keep FFF as the owner of `find`, `grep`, and file autocomplete.
 - [x] Keep Hashline responsible only for `read` and `edit`.
 
@@ -27,7 +27,7 @@
 - [x] Add Dannote Oracle with a safer review context preset.
 - [x] Add Critic as an optional extension; configure conservative triggers after runtime testing.
 - [x] Add a small audited set of model-aware rules.
-- [ ] Avoid duplicate websearch tools because `pi-web-access` already covers them.
+- [x] Avoid duplicate websearch tools because `pi-web-access` already covers them.
 
 ## Tools and context
 
@@ -37,20 +37,20 @@
 - [x] FFF uses override mode via shell environment.
 - [x] Add the `pi-context` package declaration for later evaluation.
 - [x] Add published `pi-btw` for isolated side conversations.
-- [ ] Keep Hunk as the visual review surface and retain `hunk-review` annotations.
+- [x] Keep Hunk as the visual review surface and retain `hunk-review` annotations.
 
 ## Skills
 
 - [x] Add selected Matt Pocock skills as local reproducible skills.
 - [x] Add `grilling`, `tdd`, `code-review`, `diagnosing-bugs`, `research`, and `handoff` skills.
-- [ ] Keep architecture/domain skills user-invoked.
+- [x] Keep architecture/domain skills user-invoked.
 - [ ] Collapse Elixir review into baseline, LiveView, data/deploy, security, testing, memory, and Jump overlays.
 - [ ] Remove or make optional duplicated history, contracts, maintainability, and adversarial lenses.
 
 ## Safety and workflows
 
 - [ ] Enable and test GitHub/external-write guards.
-- [ ] Keep `rm-guard`.
+- [x] Keep `rm-guard`.
 - [x] Add compact commit/review/retry workflows via the Dannote package.
 - [ ] Keep MCP instructions short and task-scoped.
 - [ ] Test normal coding, exploration, Elixir work, review, Oracle, side questions, and profile switching.
