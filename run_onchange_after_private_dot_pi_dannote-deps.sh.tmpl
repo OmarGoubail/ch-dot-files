@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+ext_dir="$HOME/.pi/agent/extensions/dannote"
+if [ ! -d "$ext_dir" ]; then
+  exit 0
+fi
+
+cd "$ext_dir"
+if command -v npm >/dev/null 2>&1; then
+  npm install --omit=dev --no-audit --no-fund
+fi

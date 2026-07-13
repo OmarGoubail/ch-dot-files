@@ -6,7 +6,6 @@
     "/opt/homebrew/bin/npm"
   ],
   "packages": [
-    "git:github.com/dannote/dot-pi",
     "npm:pi-web-access",
     "npm:pi-vim",
     "npm:pi-notify",
@@ -26,11 +25,9 @@
   },
   "theme": "theme-current",
   "extensions": [
-    "git/github.com/dannote/dot-pi/extensions/critic",
-    "git/github.com/dannote/dot-pi/extensions/plan-mode",
-    "git/github.com/dannote/dot-pi/extensions/rules",
     "!git/github.com/dannote/dot-pi/extensions/websearch/**",
-    "!git/github.com/dannote/dot-pi/extensions/webfetch/**"
+    "!git/github.com/dannote/dot-pi/extensions/webfetch/**",
+    "extensions/dannote"
   ],
   "oracle": {
     "model": "openai-codex-personal/gpt-5.6-sol",

@@ -1,0 +1,95 @@
+/**
+ * LSP Text Edit Application
+ */
+
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import type { TextEdit, WorkspaceEdit } from 'vscode-languageserver-types'
+import { uriToFile } from './utils'
+
+/**
+ * Apply text edits to a string in-memory.
+ * Edits are applied in reverse order (bottom-to-top) to preserve line/character indices.
+ */
+export function applyTextEditsToString(content: string, edits: TextEdit[]): string {
+  const lines = content.split('\n')
+
+  const sortedEdits = [...edits].sort((a, b) => {
+    if (a.range.start.line !== b.range.start.line) {
+      return b.range.start.line - a.range.start.line
+    }
+    return b.range.start.character - a.range.start.character
+  })
+
+  for (const edit of sortedEdits) {
+    const { start, end } = edit.range
+
+    if (start.line === end.line) {
+      const line = lines[start.line] || ''
+      lines[start.line] = line.slice(0, start.character) + edit.newText + line.slice(end.character)
+    } else {
+      const startLine = lines[start.line] || ''
+      const endLine = lines[end.line] || ''
+      const newContent =
+        startLine.slice(0, start.character) + edit.newText + endLine.slice(end.character)
+      lines.splice(start.line, end.line - start.line + 1, ...newContent.split('\n'))
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * Apply text edits to a file.
+ */
+export async function applyTextEdits(filePath: string, edits: TextEdit[]): Promise<void> {
+  const content = await readFile(filePath, 'utf8')
+  const result = applyTextEditsToString(content, edits)
+  await writeFile(filePath, result)
+}
+
+/**
+ * Apply a workspace edit (collection of file changes).
+ * Returns array of applied change descriptions.
+ */
+export async function applyWorkspaceEdit(edit: WorkspaceEdit, cwd: string): Promise<string[]> {
+  const applied: string[] = []
+
+  if (edit.changes) {
+    for (const [uri, textEdits] of Object.entries(edit.changes)) {
+      const filePath = uriToFile(uri)
+      await applyTextEdits(filePath, textEdits)
+      applied.push(`Applied ${textEdits.length} edit(s) to ${path.relative(cwd, filePath)}`)
+    }
+  }
+
+  if (edit.documentChanges) {
+    for (const change of edit.documentChanges) {
+      if ('textDocument' in change && 'edits' in change) {
+        const filePath = uriToFile(change.textDocument.uri)
+        const textEdits = change.edits.filter((e): e is TextEdit => 'range' in e && 'newText' in e)
+        await applyTextEdits(filePath, textEdits)
+        applied.push(`Applied ${textEdits.length} edit(s) to ${path.relative(cwd, filePath)}`)
+      } else if ('kind' in change && change.kind) {
+        if (change.kind === 'create') {
+          const filePath = uriToFile(change.uri)
+          await mkdir(path.dirname(filePath), { recursive: true })
+          await writeFile(filePath, '')
+          applied.push(`Created ${path.relative(cwd, filePath)}`)
+        } else if (change.kind === 'rename') {
+          const oldPath = uriToFile(change.oldUri)
+          const newPath = uriToFile(change.newUri)
+          await mkdir(path.dirname(newPath), { recursive: true })
+          await rename(oldPath, newPath)
+          applied.push(`Renamed ${path.relative(cwd, oldPath)} → ${path.relative(cwd, newPath)}`)
+        } else if (change.kind === 'delete') {
+          const filePath = uriToFile(change.uri)
+          await rm(filePath, { recursive: true })
+          applied.push(`Deleted ${path.relative(cwd, filePath)}`)
+        }
+      }
+    }
+  }
+
+  return applied
+}
