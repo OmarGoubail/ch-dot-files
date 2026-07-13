@@ -1,3 +1,8 @@
+# Keep pi-fff's FFF-backed tools under the built-in `grep` and `find` names.
+set -gx PI_FFF_MODE override
+set -gx FFF_FRECENCY_DB $HOME/.pi/agent/fff/frecency.mdb
+set -gx FFF_HISTORY_DB $HOME/.pi/agent/fff/history.mdb
+
 # Fix unknown terminal types on remote servers (e.g. ghostty over SSH)
 if not infocmp -- $TERM &>/dev/null
     set -gx TERM xterm-256color
