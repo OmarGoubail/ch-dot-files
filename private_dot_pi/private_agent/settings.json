@@ -6,18 +6,23 @@
     "/opt/homebrew/bin/npm"
   ],
   "packages": [
+    "git:github.com/dannote/dot-pi",
     "npm:pi-web-access",
     "npm:pi-vim",
     "npm:pi-notify",
+    "npm:@ff-labs/pi-fff@0.8.1",
+    "npm:pi-hashline-edit",
     "npm:pi-subagents",
-    "npm:pi-elixir"
+    "npm:pi-elixir",
+    "npm:pi-context",
+    "npm:pi-btw"
   ],
   "defaultThinkingLevel": "high",
   "pi-codex-fast": {
     "enabled": true
   },
   "subagents": {
-    "disableBuiltins": true
+    "disableBuiltins": false
   },
   "theme": "theme-current"
 }
