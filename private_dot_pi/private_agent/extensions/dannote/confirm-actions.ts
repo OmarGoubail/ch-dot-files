@@ -76,7 +76,6 @@ const TWITTER_RULES: CommandRule[] = [
 ]
 
 const GIT_RULES: CommandRule[] = [
-  matched(['git'], 'Force push', isGitForcePush),
   matched(['git'], 'Delete remote branch', isGitRemoteBranchDelete),
   matched(['git'], 'Hard reset', isGitHardReset),
   matched(['git'], 'Clean working tree', isGitForcedClean),
@@ -495,8 +494,10 @@ function isWord(value: unknown): value is Word {
 
 function isProtectedToolInvocation(argv: string[]): boolean {
   const command = argv[0]
+  const isGitFetch = command === 'git' && getGitSubcommand(argv) === 'fetch'
   return Boolean(
     command &&
+    !isGitFetch &&
     ['git', 'gh', 'glab', 'gws', 'bird', 'bunx', 'npm', 'pnpm', 'bun', 'yarn'].includes(command)
   )
 }
@@ -621,12 +622,6 @@ function isMutatingBird(argv: string[]): boolean {
       'follow',
       'unfollow'
     ].includes(arg)
-  )
-}
-
-function isGitForcePush(argv: string[]): boolean {
-  return (
-    getGitSubcommand(argv) === 'push' && hasAnyFlag(argv, ['--force', '--force-with-lease', '-f'])
   )
 }
 

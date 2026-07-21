@@ -1,6 +1,12 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { getModels } from "@mariozechner/pi-ai";
-import { openaiCodexOAuthProvider } from "@mariozechner/pi-ai/oauth";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+	AuthInteraction,
+	OAuthAuth,
+	OAuthCredential,
+	OAuthLoginCallbacks,
+} from "@earendil-works/pi-ai";
+import { getModels } from "@earendil-works/pi-ai/compat";
+import { builtinProviders } from "@earendil-works/pi-ai/providers/all";
 
 const SOURCE_PROVIDER = "openai-codex";
 const API = "openai-codex-responses" as const;
@@ -26,10 +32,63 @@ const EXTRA_MODELS = [
 	},
 ];
 
+function adaptCodexOAuth(oauth: OAuthAuth, name: string) {
+	return {
+		name,
+		login: async (callbacks: OAuthLoginCallbacks) => {
+			const interaction: AuthInteraction = {
+				signal: callbacks.signal,
+				notify(event) {
+					switch (event.type) {
+						case "auth_url":
+							callbacks.onAuth(event);
+							break;
+						case "device_code":
+							callbacks.onDeviceCode(event);
+							break;
+						case "progress":
+							callbacks.onProgress?.(event.message);
+							break;
+						case "info":
+							callbacks.onProgress?.(event.message);
+							break;
+					}
+				},
+				prompt: async (prompt) => {
+					if (prompt.type === "select") {
+						const selected = await callbacks.onSelect({
+							message: prompt.message,
+							options: prompt.options.map(({ id, label }) => ({ id, label })),
+						});
+						if (!selected) throw new Error("Login cancelled");
+						return selected;
+					}
+
+					if (prompt.type === "manual_code" && callbacks.onManualCodeInput) {
+						return callbacks.onManualCodeInput();
+					}
+
+					return callbacks.onPrompt({
+						message: prompt.message,
+						placeholder: prompt.placeholder,
+					});
+				},
+			};
+
+			return oauth.login(interaction);
+		},
+		refreshToken: async (credentials: OAuthCredential) =>
+			oauth.refresh({ ...credentials, type: "oauth" }),
+		getApiKey: (credentials: OAuthCredential) => credentials.access,
+	};
+}
+
 export default function (pi: ExtensionAPI) {
 	const sourceModels = getModels(SOURCE_PROVIDER);
+	const sourceProvider = builtinProviders().find((provider) => provider.id === SOURCE_PROVIDER);
+	const codexOAuth = sourceProvider?.auth.oauth;
 	const defaultBaseUrl = sourceModels[0]?.baseUrl;
-	if (!defaultBaseUrl || sourceModels.length === 0) return;
+	if (!defaultBaseUrl || sourceModels.length === 0 || !codexOAuth) return;
 
 	// Merge extra models into the source list so they get cloned to all aliases.
 	const existingIds = new Set(sourceModels.map((m) => m.id));
@@ -47,13 +106,7 @@ export default function (pi: ExtensionAPI) {
 			name: alias.name,
 			baseUrl: defaultBaseUrl,
 			api: API,
-			oauth: {
-				name: alias.name,
-				usesCallbackServer: openaiCodexOAuthProvider.usesCallbackServer,
-				login: openaiCodexOAuthProvider.login,
-				refreshToken: openaiCodexOAuthProvider.refreshToken,
-				getApiKey: openaiCodexOAuthProvider.getApiKey,
-			} as any,
+			oauth: adaptCodexOAuth(codexOAuth, alias.name) as any,
 			models: allModels.map((model) => ({
 				id: model.id,
 				name: model.name || model.id,
