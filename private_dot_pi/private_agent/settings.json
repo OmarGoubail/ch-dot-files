@@ -22,7 +22,7 @@
     "disableBuiltins": false
   },
   "theme": "theme-current",
-  "extensions": ["extensions/dannote"],
+  "extensions": ["extensions/dannote", "extensions/pi-codex-compaction"],
   "confirmActionGroups": {
     "execution": false
   },
