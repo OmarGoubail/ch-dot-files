@@ -5,9 +5,9 @@
   "npmCommand": ["/opt/homebrew/bin/npm"],
   "packages": [
     "npm:pi-web-access",
-    "npm:pi-vim",
     "npm:pi-notify",
     "npm:@ff-labs/pi-fff@0.8.1",
+    "npm:pi-vim",
     "npm:pi-hashline-edit",
     "npm:pi-subagents",
     "npm:pi-elixir",

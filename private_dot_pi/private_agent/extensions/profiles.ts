@@ -6,7 +6,7 @@
  */
 
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -33,6 +33,7 @@ type ModelSpec = {
 };
 
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "profiles.json");
+const STATE_PATH = join(homedir(), ".pi", "agent", "profile-state.json");
 const THINKING_LEVELS = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -100,6 +101,41 @@ function readProfiles(): { config: ProfilesFile; warnings: string[] } {
 	}
 }
 
+type StickyPolicy = {
+	model?: string;
+	thinking?: ThinkingLevel;
+};
+
+type StateFile = Record<string, StickyPolicy>;
+
+function readState(): StateFile {
+	try {
+		if (!existsSync(STATE_PATH)) return {};
+		const parsed = JSON.parse(readFileSync(STATE_PATH, "utf8"));
+		if (!isRecord(parsed)) return {};
+		const result: StateFile = {};
+		for (const [name, raw] of Object.entries(parsed)) {
+			if (!isRecord(raw)) continue;
+			const entry: StickyPolicy = {};
+			if (typeof raw.model === "string" && raw.model.trim()) entry.model = raw.model.trim();
+			entry.thinking = asThinking(raw.thinking, `${name}.thinking`, []);
+			result[name] = entry;
+		}
+		return result;
+	} catch {
+		return {};
+	}
+}
+
+function writeState(state: StateFile): void {
+	try {
+		writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
+	} catch {
+		// Sticky state is a convenience; ignore write failures.
+	}
+}
+
+
 function parseModelSpec(value: string): ModelSpec | undefined {
 	const slash = value.indexOf("/");
 	if (slash <= 0 || slash === value.length - 1) return undefined;
@@ -147,6 +183,9 @@ export default function profiles(pi: ExtensionAPI): void {
 	let config: ProfilesFile = { profiles: {} };
 	let currentProfile = "";
 	let loadWarnings: string[] = [];
+	let state: StateFile = {};
+	let applyingProfile = false;
+	let appliedModel: string | undefined;
 
 	function profileNames(): string[] {
 		return Object.keys(config.profiles).sort((a, b) => a.localeCompare(b));
@@ -162,8 +201,32 @@ export default function profiles(pi: ExtensionAPI): void {
 		const result = readProfiles();
 		config = result.config;
 		loadWarnings = result.warnings;
+		state = readState();
 		currentProfile = chooseProfile(preferred) || "";
 		return currentProfile || undefined;
+	}
+
+	async function trySetModel(modelSpec: string, ctx: ExtensionContext, issues: string[]): Promise<boolean> {
+		const spec = parseModelSpec(modelSpec);
+		const model = spec ? ctx.modelRegistry.find(spec.provider, spec.id) : undefined;
+		if (!model) {
+			issues.push(`${modelSpec} is unavailable (provider/model not in registry)`);
+			return false;
+		}
+		let authenticated = true;
+		try {
+			authenticated = ctx.modelRegistry.hasConfiguredAuth(model);
+		} catch {
+			// setModel below provides the definitive check.
+		}
+		if (!authenticated) issues.push(`${modelSpec} is unauthenticated (run /login ${spec!.provider} or configure its API key)`);
+		const switched = await pi.setModel(model);
+		if (!switched) {
+			issues.push(`${modelSpec} is unauthenticated or unavailable; session model was not changed`);
+			return false;
+		}
+		appliedModel = modelSpec;
+		return true;
 	}
 
 	async function applyProfile(profileName: string, ctx: ExtensionContext, reason: "startup" | "switch" | "reload"): Promise<void> {
@@ -176,28 +239,30 @@ export default function profiles(pi: ExtensionAPI): void {
 		currentProfile = profileName;
 		if (ctx.hasUI) ctx.ui.setStatus("profile", `Profile: ${currentProfile}`);
 
+		const sticky = state[profileName];
+		const policy: ModelPolicy = {
+			model: sticky?.model ?? profile.model,
+			thinking: sticky?.thinking ?? profile.thinking,
+		};
+		const usingSticky = sticky?.model !== undefined && sticky.model !== profile.model;
+
 		const issues: string[] = [];
-		if (profile.model) {
-			const spec = parseModelSpec(profile.model);
-			const model = spec ? ctx.modelRegistry.find(spec.provider, spec.id) : undefined;
-			if (!model) {
-				issues.push(`${profile.model} is unavailable (provider/model not in registry)`);
-			} else {
-				let authenticated = true;
-				try {
-					authenticated = ctx.modelRegistry.hasConfiguredAuth(model);
-				} catch {
-					// setModel below provides the definitive check.
+		applyingProfile = true;
+		try {
+			if (policy.model) {
+				const applied = await trySetModel(policy.model, ctx, issues);
+				if (!applied && usingSticky && profile.model) {
+					issues.push(`Fell back to profile default ${profile.model}`);
+					await trySetModel(profile.model, ctx, issues);
 				}
-				if (!authenticated) issues.push(`${profile.model} is unauthenticated (run /login ${spec!.provider} or configure its API key)`);
-				const switched = await pi.setModel(model);
-				if (!switched) issues.push(`${profile.model} is unauthenticated or unavailable; session model was not changed`);
 			}
+			if (policy.thinking) pi.setThinkingLevel(policy.thinking);
+		} finally {
+			applyingProfile = false;
 		}
-		if (profile.thinking) pi.setThinkingLevel(profile.thinking);
 
 		const prefix = reason === "startup" ? "Profile" : reason === "switch" ? "Switched profile" : "Reloaded profile";
-		const summary = `${prefix}: ${currentProfile} • ${modelLabel(profile)} • thinking: ${profile.thinking || "session default"}`;
+		const summary = `${prefix}: ${currentProfile} • ${modelLabel(policy)}${usingSticky ? " (last used)" : ""} • thinking: ${policy.thinking || "session default"}`;
 		notify(ctx, issues.length ? `${summary}\n${issues.join("\n")}` : summary, issues.length ? "warning" : "info");
 		for (const warning of loadWarnings) notify(ctx, warning, "warning");
 	}
@@ -208,6 +273,9 @@ export default function profiles(pi: ExtensionAPI): void {
 		const lines = [
 			`Profile: ${currentProfile}${config.active_profile ? ` (configured active: ${config.active_profile})` : ""}`,
 			`Account model: ${modelDiagnostic(profile, ctx)}`,
+			...(state[currentProfile]?.model
+				? [`Last used: ${state[currentProfile].thinking ? `${state[currentProfile].model}:${state[currentProfile].thinking}` : state[currentProfile].model}`]
+				: []),
 			`Thinking: ${profile.thinking || "session default"}`,
 			"Subagents:",
 		];
@@ -273,10 +341,29 @@ export default function profiles(pi: ExtensionAPI): void {
 		patchSubagentInput(event.input, ctx);
 	});
 
+	pi.on("model_select", (event, ctx) => {
+		const spec = `${event.model.provider}/${event.model.id}`;
+		if (spec === appliedModel) {
+			appliedModel = undefined;
+			return;
+		}
+		if (applyingProfile || !currentProfile || event.source === "restore") return;
+		const thinking = THINKING_LEVELS.has(ctx.thinkingLevel as ThinkingLevel) ? (ctx.thinkingLevel as ThinkingLevel) : undefined;
+		state[currentProfile] = { model: spec, thinking };
+		writeState(state);
+	});
+
+	pi.on("thinking_level_select", (event) => {
+		if (applyingProfile || !currentProfile) return;
+		if (!THINKING_LEVELS.has(event.level as ThinkingLevel)) return;
+		state[currentProfile] = { ...state[currentProfile], thinking: event.level as ThinkingLevel };
+		writeState(state);
+	});
+
 	pi.registerCommand("profile", {
 		description: "Switch account profile, inspect status, or reload profiles.json",
 		getArgumentCompletions: (prefix: string) => {
-			const items = ["status", "reload", ...profileNames()];
+			const items = ["status", "reload", "reset", ...profileNames()];
 			const trimmed = prefix.trim();
 			return items.filter((value) => value.startsWith(trimmed)).map((value) => ({ value, label: value }));
 		},
@@ -292,6 +379,16 @@ export default function profiles(pi: ExtensionAPI): void {
 					notify(ctx, `No profiles configured in ${CONFIG_PATH}`, "warning");
 					return;
 				}
+				await applyProfile(currentProfile, ctx, "reload");
+				return;
+			}
+			if (arg === "reset") {
+				if (!currentProfile) {
+					notify(ctx, `No profiles configured in ${CONFIG_PATH}`, "warning");
+					return;
+				}
+				delete state[currentProfile];
+				writeState(state);
 				await applyProfile(currentProfile, ctx, "reload");
 				return;
 			}
