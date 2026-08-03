@@ -2,7 +2,7 @@
   "lastChangelogVersion": "0.80.3",
   "defaultProvider": "fireworks",
   "defaultModel": "accounts/fireworks/models/glm-5p2",
-  "npmCommand": ["/opt/homebrew/bin/npm"],
+  "npmCommand": ["npm"],
   "packages": [
     "npm:pi-web-access",
     "npm:pi-notify",
