@@ -42,7 +42,7 @@
     "command": "if command -q wt; and test -n \"$ZED_WORKTREE_ROOT\"; and test -n \"$ZED_MAIN_GIT_WORKTREE\"; and test \"$ZED_WORKTREE_ROOT\" != \"$ZED_MAIN_GIT_WORKTREE\"; cd \"$ZED_WORKTREE_ROOT\"; and wt step copy-ignored; end",
     "args": [],
     "env": {},
-    "shell": { "program": "/opt/homebrew/bin/fish" },
+    "shell": { "program": "fish" },
     "use_new_terminal": true,
     "allow_concurrent_runs": true,
     "hooks": ["create_worktree"],

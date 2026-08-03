@@ -97,7 +97,7 @@ opt.spelllang = { "en" }
 opt.diffopt:append({ "indent-heuristic", "inline:word", "linematch:60" })
 
 -- Shell
-vim.o.shell = "/opt/homebrew/bin/fish"
+vim.o.shell = "fish"
 
 -- Project-local config
 opt.exrc = true
