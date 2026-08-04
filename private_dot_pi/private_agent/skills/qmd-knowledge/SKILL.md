@@ -6,6 +6,7 @@ description: Search and capture durable personal and project knowledge in the sh
 # Shared QMD knowledge
 
 The shared QMD vault is hosted on `callisto` and accessed through the local wrappers `qmd-remote` and `qmd-remote-capture`.
+Use the QMD CLI through `qmd-remote` for every QMD operation; QMD is not configured as an MCP server. Run `qmd-remote --help` when you need commands beyond search, retrieval, capture, update, or embedding.
 
 ## Search workflow
 
@@ -57,4 +58,5 @@ Search first to avoid duplicating an existing note. QMD reindexes new captures a
 - `notes.md` is transient session scratch, not durable memory.
 - QMD indexes Markdown files; it is not itself the source of truth.
 - Do not store secrets, tokens, or private credentials.
+- Do not remove collections, alter collection configuration, or clean the index without explicit user approval.
 - Do not silently capture every conversation; durable capture requires explicit user intent.
