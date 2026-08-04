@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "linear": {
+      "description": "Linear issues, projects, and workflow tooling",
+      "baseUrl": "https://mcp.linear.app/mcp",
+      "auth": "oauth"
+    },
+    "tidewave": {
+      "description": "Phoenix runtime MCP — only available when local dev server is running on :4000",
+      "baseUrl": "http://localhost:4000/tidewave/mcp"
+    },
+    "figma": {
+      "description": "Figma file and component access",
+      "command": "npx",
+      "args": [
+        "-y",
+        "figma-developer-mcp",
+        "--stdio"
+      ],
+      "env": {
+        "FIGMA_API_KEY": "${FIGMA_API_KEY}"
+      }
+    },
+    "grep-app": {
+      "description": "Cross-repo code search across public GitHub repos via grep.app",
+      "command": "npx",
+      "args": [
+        "-y",
+        "grep-mcp"
+      ]
+    },
+    "context7": {
+      "description": "Fetch up-to-date library and framework documentation by library ID",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "qmd": {
+      "baseUrl": "https://callisto.tail6e45bd.ts.net/qmd/mcp",
+      "description": "Shared QMD knowledge vault on callisto"
+    }
+  }
+}
