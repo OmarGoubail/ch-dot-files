@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then
+  printf 'Usage: qmd-remote <qmd-command> [args...]\n' >&2
+  exit 2
+fi
+
+remote_command='runuser -u qmd -- env HOME=/var/lib/qmd XDG_CONFIG_HOME=/var/lib/qmd/.config XDG_CACHE_HOME=/var/lib/qmd/.cache qmd'
+for argument in "$@"; do
+  printf -v quoted_argument '%q' "$argument"
+  remote_command+=" $quoted_argument"
+done
+
+encoded_command="$(printf '%s' "$remote_command" | base64 | tr -d '\n')"
+exec tailscale ssh root@callisto -T "printf '%s' '$encoded_command' | base64 -d | bash"

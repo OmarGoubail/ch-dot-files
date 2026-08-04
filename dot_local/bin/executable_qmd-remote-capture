@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+  printf 'Usage: qmd-remote-capture PATH.md\n' >&2
+  exit 2
+fi
+
+printf -v quoted_path '%q' "$1"
+exec tailscale ssh root@callisto -T "/usr/local/sbin/qmd-capture $quoted_path"
