@@ -36,10 +36,6 @@
         "-y",
         "@upstash/context7-mcp"
       ]
-    },
-    "qmd": {
-      "baseUrl": "https://callisto.tail6e45bd.ts.net/qmd/mcp",
-      "description": "Shared QMD knowledge vault on callisto"
     }
   }
 }
