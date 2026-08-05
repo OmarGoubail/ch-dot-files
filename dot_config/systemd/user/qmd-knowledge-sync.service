@@ -1,0 +1,15 @@
+[Unit]
+Description=Sync the local QMD knowledge vault
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Documents/knowledge
+Environment=HOME=%h
+Environment=PATH=%h/.local/share/mise/installs/node/lts/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/Documents/knowledge/scripts/sync.sh
+Nice=10
+TimeoutStartSec=30min
+StandardOutput=journal
+StandardError=journal

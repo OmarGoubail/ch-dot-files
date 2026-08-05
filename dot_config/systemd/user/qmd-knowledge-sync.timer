@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the QMD knowledge vault sync daily
+
+[Timer]
+OnCalendar=*-*-* 18:00:00
+Persistent=true
+AccuracySec=1min
+Unit=qmd-knowledge-sync.service
+
+[Install]
+WantedBy=timers.target

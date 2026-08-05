@@ -1,6 +1,6 @@
 #!/bin/bash
 # Link the vendored vim-herdr-navigation plugin into herdr's plugin registry.
-# Runs once after chezmoi apply; idempotent.
+# Runs after each chezmoi apply; idempotent and retries if herdr was unavailable.
 
 set -euo pipefail
 

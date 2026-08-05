@@ -1,0 +1,20 @@
+[Unit]
+Description=Jump API development containers
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/dev/Jump/api
+Environment=HOME=%h
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/podman-compose -f docker-compose.yml -f docker-compose.linux.yml up -d --wait --wait-timeout 120
+ExecStop=/usr/bin/podman-compose -f docker-compose.yml -f docker-compose.linux.yml stop -t 30
+TimeoutStartSec=5min
+TimeoutStopSec=2min
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

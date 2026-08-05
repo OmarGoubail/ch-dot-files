@@ -1,30 +1,31 @@
 ---
 name: qmd-knowledge
-description: Search and capture durable personal and project knowledge in the shared QMD vault. Use when the user asks what was decided before, asks to remember something, or needs context from prior work.
+description: Search and capture durable personal and project knowledge in the local QMD collection. Use when the user asks what was decided before, asks to remember something, or needs context from prior work.
 ---
 
-# Shared QMD knowledge
+# Local QMD knowledge
 
-The shared QMD vault is hosted on `callisto` and accessed through the local wrappers `qmd-remote` and `qmd-remote-capture`.
-Use the QMD CLI through `qmd-remote` for every QMD operation; QMD is not configured as an MCP server. Run `qmd-remote --help` when you need commands beyond search, retrieval, capture, update, or embedding.
+The durable knowledge source is the Git repository `~/Documents/knowledge`, registered locally as the QMD collection `knowledge`. QMD's index and embeddings live outside the repository and are rebuilt per machine.
 
 ## Search workflow
 
 Search before answering when the question may depend on prior knowledge:
 
 ```bash
-qmd-remote search "exact project term" -n 10
-qmd-remote query $'intent: Find the relevant durable decision.\nlex: exact names and terms\nvec: semantic description of the needed knowledge'
+qmd search "exact project term" -c knowledge -n 10
+qmd query $'intent: Find the relevant durable decision.\nlex: exact names and terms\nvec: semantic description of the needed knowledge' -c knowledge -n 10
 ```
 
-Retrieve the complete relevant documents before relying on snippets:
+Use `qmd search` for exact names, titles, symbols, or phrases. Use structured `qmd query` for conceptual recall. Do not rely on snippets when the user needs facts, decisions, quotes, or nuance.
+
+Retrieve complete relevant documents before relying on search results:
 
 ```bash
-qmd-remote get "#docid"
-qmd-remote multi-get "projects/Jump/*.md" --format md
+qmd get "#docid"
+qmd multi-get "qmd://knowledge/projects/Jump/*.md" --format md
 ```
 
-Use `qmd-remote search` for exact names and `qmd-remote query` for conceptual recall. Cite retrieved paths and line numbers when reporting facts.
+`qmd get` and `qmd multi-get` include line numbers. Cite the local source path and exact line numbers when reporting retrieved facts.
 
 ## Capture workflow
 
@@ -33,7 +34,7 @@ Only capture durable knowledge when the user explicitly asks to remember it or t
 Create a new Markdown note; do not overwrite an existing note:
 
 ```bash
-qmd-remote-capture topics/topic-name.md <<'EOF'
+cat > ~/Documents/knowledge/topics/topic-name.md <<'EOF'
 ---
 title: Short descriptive title
 type: topic
@@ -42,6 +43,8 @@ status: active
 
 The durable knowledge, written concisely.
 EOF
+qmd update
+qmd embed -c knowledge
 ```
 
 Use these paths:
@@ -51,7 +54,7 @@ Use these paths:
 - `decisions/<slug>.md` for explicit architectural or workflow decisions
 - `inbox/<slug>.md` when classification is unclear
 
-Search first to avoid duplicating an existing note. QMD reindexes new captures automatically. Run `qmd-remote embed` after a batch of captures when semantic search should include them.
+Search first to avoid duplicating an existing note. Commit Markdown changes to the knowledge repository when they should be backed up or synchronized to another machine.
 
 ## Boundaries
 
@@ -60,3 +63,17 @@ Search first to avoid duplicating an existing note. QMD reindexes new captures a
 - Do not store secrets, tokens, or private credentials.
 - Do not remove collections, alter collection configuration, or clean the index without explicit user approval.
 - Do not silently capture every conversation; durable capture requires explicit user intent.
+
+## Sync and setup
+
+On another machine, clone the knowledge repository and register the clone:
+
+```bash
+cd ~/Documents/knowledge
+qmd collection add "$PWD" --name knowledge
+qmd context add qmd://knowledge/ "Shared personal engineering knowledge: projects, topics, decisions, and durable agent notes."
+qmd update
+qmd embed -c knowledge
+```
+
+The repository is the source of truth. Do not commit QMD's SQLite index or embeddings. Do not store secrets, tokens, or private credentials in the vault.
