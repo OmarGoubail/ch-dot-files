@@ -8,19 +8,23 @@ opt.confirm = true
 opt.mouse = "a"
 opt.sessionoptions = { "buffers", "curdir", "resize", "tabpages", "terminal", "winpos", "winsize" }
 
--- Clipboard: use OSC52 over SSH; otherwise let Neovim detect the local provider
+-- Clipboard: use write-only OSC52 over SSH; otherwise use the local provider
 if vim.env.SSH_CONNECTION then
   opt.clipboard = ""
   local osc52 = require("vim.ui.clipboard.osc52")
+  local function empty_paste()
+    return { {}, "v" }
+  end
+
   vim.g.clipboard = {
-    name = "OSC 52",
+    name = "OSC 52 (copy only)",
     copy = {
       ["+"] = osc52.copy("+"),
       ["*"] = osc52.copy("*"),
     },
     paste = {
-      ["+"] = osc52.paste("+"),
-      ["*"] = osc52.paste("*"),
+      ["+"] = empty_paste,
+      ["*"] = empty_paste,
     },
   }
 else
