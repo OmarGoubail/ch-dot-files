@@ -10,6 +10,7 @@ opt.sessionoptions = { "buffers", "curdir", "resize", "tabpages", "terminal", "w
 
 -- Clipboard: use OSC52 over SSH; otherwise let Neovim detect the local provider
 if vim.env.SSH_CONNECTION then
+  opt.clipboard = ""
   local osc52 = require("vim.ui.clipboard.osc52")
   vim.g.clipboard = {
     name = "OSC 52",
@@ -22,11 +23,11 @@ if vim.env.SSH_CONNECTION then
       ["*"] = osc52.paste("*"),
     },
   }
+else
+  vim.schedule(function()
+    opt.clipboard = "unnamedplus"
+  end)
 end
-
-vim.schedule(function()
-  opt.clipboard = "unnamedplus"
-end)
 
 -- Search
 opt.ignorecase = true

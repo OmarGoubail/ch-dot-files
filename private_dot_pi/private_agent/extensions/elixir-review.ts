@@ -6,19 +6,17 @@
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
 
-const GLOBAL_MEMORY_DIR = join(homedir(), ".pi", "review-memory");
-const PROJECT_MEMORY_REL = join(".pi", "review-memory"); // Legacy path only; MVP stores memory globally in ~/.pi/review-memory.
+const KNOWLEDGE_ROOT = process.env.QMD_KNOWLEDGE_ROOT ?? join(homedir(), "Documents", "knowledge");
+const QMD_COLLECTION = "knowledge";
+const GLOBAL_PATTERN_FILE = join("topics", "reviewer-patterns.md");
+const REVIEW_PATTERN_DIR = "review-patterns";
+const REVIEW_REFLECTION_DIR = "review-reflections";
 
-function expandHome(path: string): string {
-	if (path === "~") return homedir();
-	if (path.startsWith("~/")) return join(homedir(), path.slice(2));
-	return path;
-}
 
 function gitRoot(cwd: string): string | undefined {
 	try {
@@ -37,36 +35,76 @@ function repoSlug(cwd: string): string {
 	return slugify(basename(root) || "repo");
 }
 
-function repoMemoryDir(cwd: string): string {
-	// Repo-specific memory is stored centrally under ~/.pi, not inside the repo.
-	return join(GLOBAL_MEMORY_DIR, "repos", repoSlug(cwd));
+function repoPatternDir(cwd: string): string {
+ const path = join("projects", repoSlug(cwd), REVIEW_PATTERN_DIR);
+ return path;
+}
+
+function repoReflectionDir(cwd: string): string {
+ return join("projects", repoSlug(cwd), REVIEW_REFLECTION_DIR);
+}
+
+function knowledgePath(relativePath: string): string {
+ return join(KNOWLEDGE_ROOT, relativePath);
+}
+
+function qmdUri(relativePath: string): string {
+ return `qmd://${QMD_COLLECTION}/${relativePath.replaceAll("\\", "/")}`;
 }
 
 function hasFile(path: string): boolean {
-	return existsSync(path);
+ return existsSync(path);
+}
+
+function runQmd(args: string[]): string {
+ return execFileSync("qmd", args, {
+  cwd: KNOWLEDGE_ROOT,
+  encoding: "utf-8",
+  stdio: ["ignore", "pipe", "pipe"],
+  env: { ...process.env, FORCE_COLOR: "0", NO_COLOR: "1" },
+  maxBuffer: 2_000_000,
+ });
+}
+
+function qmdCollectionStatus(): string {
+ if (!existsSync(KNOWLEDGE_ROOT)) return "knowledge root missing";
+
+ try {
+  const output = runQmd(["collection", "list"]);
+  return output.includes(`${QMD_COLLECTION} (`) ? "registered" : "collection not registered";
+ } catch {
+  return "qmd unavailable";
+ }
+}
+
+function globalPatternPaths(): string[] {
+ return [GLOBAL_PATTERN_FILE, join("topics", REVIEW_PATTERN_DIR, "*.md")];
+}
+
+function repoPatternPaths(cwd: string): string[] {
+ const directory = repoPatternDir(cwd);
+ return [join("projects", repoSlug(cwd), "review-patterns.md"), join(directory, "*.md")];
 }
 
 function memoryStatus(cwd: string) {
-	const root = projectRoot(cwd);
-	const globalDir = expandHome(GLOBAL_MEMORY_DIR);
-	const repoDir = repoMemoryDir(cwd);
-	return {
-		cwd,
-		root,
-		globalDir,
-		repoSlug: repoSlug(cwd),
-		repoDir,
-		legacyProjectDir: join(root, PROJECT_MEMORY_REL),
-		globalPatternsMd: join(globalDir, "patterns.md"),
-		globalPatternsJson: join(globalDir, "patterns.json"),
-		globalPrs: join(globalDir, "prs"),
-		repoPatternsMd: join(repoDir, "patterns.md"),
-		repoPatternsJson: join(repoDir, "patterns.json"),
-		repoPrs: join(repoDir, "prs"),
-		mixProjects: findMixProjects(root),
-		isElixir: detectElixir(root),
-		isJump: detectJump(root),
-	};
+ const root = projectRoot(cwd);
+ const slug = repoSlug(cwd);
+ const repoPatterns = repoPatternPaths(cwd);
+ return {
+  cwd,
+  root,
+  knowledgeRoot: KNOWLEDGE_ROOT,
+  qmdStatus: qmdCollectionStatus(),
+  repoSlug: slug,
+  globalPatternFile: knowledgePath(GLOBAL_PATTERN_FILE),
+  globalPatternUri: qmdUri(GLOBAL_PATTERN_FILE),
+  repoPatternDir: knowledgePath(repoPatternDir(cwd)),
+  repoPatternUri: qmdUri(repoPatternDir(cwd)),
+  repoPatternPaths: repoPatterns.map(qmdUri),
+  mixProjects: findMixProjects(root),
+  isElixir: detectElixir(root),
+  isJump: detectJump(root),
+ };
 }
 
 function findMixProjects(root: string): string[] {
@@ -110,78 +148,25 @@ function detectJump(root: string): boolean {
 	}
 }
 
-function patternsMarkdown(scope = "Global"): string {
-	return `# ${scope} Review Memory Patterns
-
-## Generally Useful Patterns
-- Pattern: <short rule>
-  - Applies when: <scope>
-  - Source repo: <repo/app name>
-  - Evidence: <PR/comment/source>
-  - Reviewer action: <what to check next time>
-
-## Repo-Specific Conventions
-- Pattern: <repo-specific rule>
-  - Repo: <repo/app name>
-  - Applies when: <scope>
-  - Detection: <search/read strategy>
-  - Evidence: <file/PR/comment>
-
-## Repeated Misses
-- Miss: <what reviewers/developers keep missing>
-  - Repo/source: <repo/app name or global>
-  - Why it matters: <impact>
-  - Detection: <search/read strategy>
-  - Example: <file/PR/comment>
-`;
-}
-
-function ensureMemoryDir(dir: string): string[] {
-	const created: string[] = [];
-	if (!existsSync(dir)) {
-		mkdirSync(dir, { recursive: true });
-		created.push(dir);
-	}
-	const patternsMd = join(dir, "patterns.md");
-	const patternsJson = join(dir, "patterns.json");
-	const prs = join(dir, "prs");
-	if (!existsSync(patternsMd)) {
-		writeFileSync(patternsMd, patternsMarkdown(dir.includes(`${GLOBAL_MEMORY_DIR}/repos/`) ? "Repo-Specific" : "Global"), "utf-8");
-		created.push(patternsMd);
-	}
-	if (!existsSync(patternsJson)) {
-		writeFileSync(patternsJson, '{ "patterns": [] }\n', "utf-8");
-		created.push(patternsJson);
-	}
-	if (!existsSync(prs)) {
-		mkdirSync(prs, { recursive: true });
-		created.push(prs);
-	}
-	return created;
-}
 
 function statusText(cwd: string): string {
-	const s = memoryStatus(cwd);
-	return [
-		"Elixir review memory status",
-		`cwd: ${s.cwd}`,
-		`project root: ${s.root}`,
-		`Elixir repo: ${s.isElixir ? "yes" : "no"}`,
-		...(s.mixProjects.length > 0 ? [`Mix projects: ${s.mixProjects.map((p) => p.startsWith(s.root) ? p.slice(s.root.length + 1) : p).join(", ")}${s.mixProjects.length >= 8 ? ", ..." : ""}`] : [`Mix projects: none found under ${s.root}`]),
-		`Jump signals: ${s.isJump ? "yes" : "no"}`,
-		"",
-		"Global memory pool (shared generally useful lessons):",
-		`- ${s.globalPatternsMd}: ${hasFile(s.globalPatternsMd) ? "found" : "missing"}`,
-		`- ${s.globalPatternsJson}: ${hasFile(s.globalPatternsJson) ? "found" : "missing"}`,
-		`- ${s.globalPrs}/: ${hasFile(s.globalPrs) ? "found" : "missing"}`,
-		"",
-		`Current repo memory bucket (${s.repoSlug}, stored centrally under ~/.pi):`,
-		`- ${s.repoPatternsMd}: ${hasFile(s.repoPatternsMd) ? "found" : "missing"}`,
-		`- ${s.repoPatternsJson}: ${hasFile(s.repoPatternsJson) ? "found" : "missing"}`,
-		`- ${s.repoPrs}/: ${hasFile(s.repoPrs) ? "found" : "missing"}`,
-		"",
-		`Legacy in-repo path not used by init: ${s.legacyProjectDir}`,
-	].join("\n");
+ const s = memoryStatus(cwd);
+ return [
+  "Elixir review memory status",
+  `cwd: ${s.cwd}`,
+  `project root: ${s.root}`,
+  `Elixir repo: ${s.isElixir ? "yes" : "no"}`,
+  ...(s.mixProjects.length > 0 ? [`Mix projects: ${s.mixProjects.map((p) => p.startsWith(s.root) ? p.slice(s.root.length + 1) : p).join(", ")}${s.mixProjects.length >= 8 ? ", ..." : ""}`] : [`Mix projects: none found under ${s.root}`]),
+  `Jump signals: ${s.isJump ? "yes" : "no"}`,
+  "",
+  "QMD review memory:",
+  `- knowledge root: ${s.knowledgeRoot}`,
+  `- collection: ${s.qmdStatus}`,
+  `- global patterns: ${s.globalPatternFile}: ${hasFile(s.globalPatternFile) ? "found" : "missing"}`,
+  `- repo patterns: ${s.repoPatternDir}/: ${hasFile(s.repoPatternDir) ? "found" : "missing"}`,
+  "",
+  "QMD is the source of truth; pattern and reflection writes create new Markdown notes and refresh the index.",
+ ].join("\n");
 }
 
 function usage(): string {
@@ -192,7 +177,7 @@ function usage(): string {
 		"  1. /elixir-review status",
 		"     Check whether this repo looks like Elixir/Jump and whether memory exists.",
 		"  2. /elixir-review init",
-		"     Run once per machine/repo to create ~/.pi/review-memory plus a central repo bucket under ~/.pi/review-memory/repos/<repo>.",
+		"     Verify the QMD knowledge vault and collection used for review memory.",
 		"  3. /elixir-review prompt current changes",
 		"     Puts a ready review request in the editor. Submit it to run a focused reviewer with the Elixir skills.",
 		"  4. /elixir-review learn PR-1234",
@@ -200,8 +185,8 @@ function usage(): string {
 		"",
 		"Commands:",
 		"  /elixir-review help                Show this help",
-		"  /elixir-review status              Show memory paths and repo detection",
-		"  /elixir-review init                Create global pool and current repo bucket under ~/.pi/review-memory",
+		"  /elixir-review status              Show QMD memory and repo detection",
+		"  /elixir-review init                Verify the QMD knowledge vault and collection",
 		"  /elixir-review prompt [scope]      Put a ready review prompt in the editor",
 		"  /elixir-review learn <PR-or-label> Put a memory-learning prompt in the editor",
 		"",
@@ -224,7 +209,7 @@ function nextStepsText(): string {
 	].join("\n");
 }
 
-function reviewPrompt(scope = "current changes"): string {
+function reviewPrompt(scope = "current changes", cwd = process.cwd()): string {
 	const prMatch = scope.match(/\bPR\s+(\d+)\b/i) || scope.match(/^\s*(\d+)\s*$/);
 	const prNumber = prMatch?.[1];
 	const scopeInstructions = prNumber
@@ -267,7 +252,7 @@ Use one reviewer by default. Add an optional second reviewer only when independe
 \n
 Checks: read repo instructions and discovered aliases/scripts first. Run required and relevant native checks (for example format, compile, Credo, mix jump.ci.lint, and targeted tests) when available and safe. For a PR patch not checked out locally, use patch-only review and mark local checks skipped, or ask before creating/checking out a worktree. List every relevant check as passed, failed, or skipped with its reason.
 \n
-Memory: read ~/.pi/review-memory/patterns.md and ~/.pi/review-memory/repos/<current-repo>/patterns.md when present via review_memory read. Treat memory as a verification lens, not proof. Ordinary reviews are read-only: do not call append_pattern or write_reflection. Those writes require explicit /elixir-review learn (or another explicit persistence request). State whether memory was consulted.
+	Memory: use the QMD-backed review_memory read action for global and repo scopes. The canonical global note is ${qmdUri(GLOBAL_PATTERN_FILE)}; repo-specific notes are under ${qmdUri(repoPatternDir(cwd))}/. Treat memory as a verification lens, not proof. Ordinary reviews are read-only: do not call append_pattern or write_reflection. Those writes require explicit /elixir-review learn (or another explicit persistence request). State whether memory was consulted.
 \n
 Return one consolidated review with exact file:line or file:start-end references whenever possible; derive patch-only locations from hunks. Do not suppress verified advisory findings, coverage gaps, or human-requested changes. If a location is unstable, use line unknown and explain why. Use this format:
 \n
@@ -305,7 +290,20 @@ Residual risks: <meaningful risks not captured above, or none>`;
 }
 
 function slugify(input: string): string {
-	return input.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "unknown";
+ return input.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "unknown";
+}
+
+function oneLine(input: string, maxLength = 120): string {
+ return input.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function redactSecrets(text: string): string {
+ return text
+  .replace(/\b(?:sk|ghp|github_pat|glpat|xox[baprs])[-_][A-Za-z0-9_-]+\b/g, "[REDACTED_SECRET]")
+  .replace(/\bAIza[0-9A-Za-z_-]+\b/g, "[REDACTED_SECRET]")
+  .replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED_SECRET]")
+  .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [REDACTED_SECRET]")
+  .replace(/((?:api[_ -]?key|token|password|secret)\s*[:=]\s*)([^\s,;]+)/gi, "$1[REDACTED_SECRET]");
 }
 
 function prNumberFromLabel(label: string): string | undefined {
@@ -360,14 +358,17 @@ Use human feedback pasted in this conversation or editor as the source of truth.
 
 ${sourceInstructions}
 
-Memory dirs have been initialized for this learning workflow:
-- Global reusable pool: ${s.globalDir}
-- Current repo bucket: ${s.repoDir}
+	QMD-backed review memory for this learning workflow:
+	- Knowledge vault: ${s.knowledgeRoot}
+	- QMD collection: ${s.qmdStatus}
+	- Global patterns: ${s.globalPatternUri} and ${qmdUri(join("topics", REVIEW_PATTERN_DIR))}/
+	- Current repo patterns: ${s.repoPatternUri}/
+	- New notes are written to the knowledge repository and indexed with QMD; existing notes are never overwritten.
 
-Persistence approval:
-- Invoking /elixir-review learn ${label} is explicit user approval to persist durable review-memory entries for this learning task.
-- You may call review_memory append_pattern and review_memory write_reflection. Use those extension-backed actions for memory writes, not generic file writes.
-- Ordinary /elixir-review prompt reviews must not write memory unless the user explicitly asks to learn/persist.
+	Persistence approval:
+	- Invoking /elixir-review learn ${label} is explicit user approval to persist durable review-memory entries for this learning task.
+	- You may call review_memory append_pattern and write_reflection. These actions create new QMD Markdown notes and refresh the QMD index.
+	- Ordinary /elixir-review prompt reviews must not write memory unless the user explicitly asks to learn/persist.
 
 What to persist:
 - Repo-specific reviewer/project preferences go to scope repo.
@@ -388,26 +389,107 @@ ${reflectionTemplate(label)}
 6. If there are no durable lessons, write no pattern; optionally write a brief reflection only if it helps explain why nothing should be learned.`;
 }
 
-function uniqueReflectionPath(dir: string, label: string): string {
-	const prsDir = join(dir, "prs");
-	mkdirSync(prsDir, { recursive: true });
-	const date = new Date().toISOString().slice(0, 10);
-	const base = `${date}-${slugify(label)}`;
-	let file = join(prsDir, `${base}.md`);
-	let n = 2;
-	while (existsSync(file)) {
-		file = join(prsDir, `${base}-${n}.md`);
-		n += 1;
-	}
-	return file;
+function qmdMemoryPaths(cwd: string, scope: "global" | "repo" | "both"): string[] {
+ const paths = [
+  ...(scope === "global" || scope === "both" ? globalPatternPaths() : []),
+  ...(scope === "repo" || scope === "both" ? repoPatternPaths(cwd) : []),
+ ];
+ return [...new Set(paths)];
 }
 
-function writeReflection(cwd: string, label: string, reflection: string, scope?: "global" | "repo" | "both"): string {
-	const dir = scope === "global" ? GLOBAL_MEMORY_DIR : repoMemoryDir(cwd);
-	ensureMemoryDir(dir);
-	const file = uniqueReflectionPath(dir, label);
-	writeFileSync(file, `${reflection.trim()}\n`, "utf-8");
-	return file;
+function readQmdMemory(cwd: string, scope: "global" | "repo" | "both"): string {
+ const status = qmdCollectionStatus();
+ if (status !== "registered") {
+  return `QMD review memory unavailable: collection '${QMD_COLLECTION}' is ${status}.`;
+ }
+
+ const documents = qmdMemoryPaths(cwd, scope)
+  .map((path) => {
+   try {
+    return runQmd(["multi-get", qmdUri(path), "--format", "md", "--no-line-numbers", "-l", "240", "--max-bytes", "50000"]).trim();
+   } catch {
+    return "";
+   }
+  })
+  .filter(Boolean);
+
+ if (documents.length === 0) {
+  return `No QMD review pattern notes found for scope '${scope}'.`;
+ }
+
+ return [`QMD review memory (${scope})`, ...documents].join("\n\n---\n\n");
+}
+
+function ensureQmdCollection(): void {
+ const status = qmdCollectionStatus();
+ if (status !== "registered") {
+  throw new Error(`QMD collection '${QMD_COLLECTION}' is ${status}; register ${KNOWLEDGE_ROOT} before writing review memory.`);
+ }
+}
+
+function uniqueKnowledgePath(directory: string, baseName: string): string {
+ mkdirSync(knowledgePath(directory), { recursive: true });
+ let suffix = 1;
+ let relativePath = join(directory, `${baseName}.md`);
+ while (existsSync(knowledgePath(relativePath))) {
+  suffix += 1;
+  relativePath = join(directory, `${baseName}-${suffix}.md`);
+ }
+ return relativePath;
+}
+
+function noteContent(title: string, type: "review-pattern" | "review-reflection", scope: "global" | "repo", cwd: string, body: string): string {
+ const metadata = [
+  "---",
+  `title: ${JSON.stringify(oneLine(title))}`,
+  `type: ${JSON.stringify(type)}`,
+  `status: "active"`,
+  `scope: ${JSON.stringify(scope)}`,
+  ...(scope === "repo" ? [`project: ${JSON.stringify(repoSlug(cwd))}`] : []),
+  `created_at: ${JSON.stringify(new Date().toISOString())}`,
+  `source: "pi-elixir-review"`,
+  "---",
+ ];
+ return `${metadata.join("\n")}\n\n${body.trim()}\n`;
+}
+
+function writePattern(cwd: string, pattern: string, scope: "global" | "repo" | "both"): string[] {
+ ensureQmdCollection();
+ const safePattern = redactSecrets(pattern.trim());
+ const date = new Date().toISOString().slice(0, 10);
+ const scopes = scope === "both" ? ["global", "repo"] : [scope];
+
+ return scopes.map((targetScope) => {
+  const directory = targetScope === "global" ? join("topics", REVIEW_PATTERN_DIR) : repoPatternDir(cwd);
+  const baseName = `${date}-${slugify(safePattern)}`;
+  const relativePath = uniqueKnowledgePath(directory, baseName);
+  const title = `Review Pattern: ${oneLine(safePattern)}`;
+  const content = noteContent(title, "review-pattern", targetScope, cwd, `# ${title}\n\n${safePattern}`);
+  writeFileSync(knowledgePath(relativePath), content, { encoding: "utf-8", flag: "wx" });
+  return qmdUri(relativePath);
+ });
+}
+
+function writeReflection(cwd: string, label: string, reflection: string, scope: "global" | "repo" | "both"): string {
+ ensureQmdCollection();
+ const targetScope = scope === "global" ? "global" : "repo";
+ const safeLabel = redactSecrets(label.trim());
+ const directory = targetScope === "global" ? join("topics", REVIEW_REFLECTION_DIR) : repoReflectionDir(cwd);
+ const baseName = `${new Date().toISOString().slice(0, 10)}-${slugify(safeLabel)}`;
+ const relativePath = uniqueKnowledgePath(directory, baseName);
+ const content = noteContent(`Review Reflection: ${safeLabel}`, "review-reflection", targetScope, cwd, redactSecrets(reflection.trim()));
+ writeFileSync(knowledgePath(relativePath), content, { encoding: "utf-8", flag: "wx" });
+ return qmdUri(relativePath);
+}
+
+function refreshQmd(): string | undefined {
+ try {
+  runQmd(["update"]);
+  runQmd(["embed", "-c", QMD_COLLECTION]);
+  return undefined;
+ } catch (error) {
+  return String(error);
+ }
 }
 
 function notifyOrDisplay(pi: ExtensionAPI, ctx: ExtensionCommandContext, content: string, title = "Elixir Review") {
@@ -447,14 +529,13 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			if (subcommand === "init") {
-				const created = [...ensureMemoryDir(GLOBAL_MEMORY_DIR), ...ensureMemoryDir(repoMemoryDir(ctx.cwd))];
 				const s = memoryStatus(ctx.cwd);
 				const message = [
-					created.length > 0 ? `Created:\n${created.map((p) => `- ${p}`).join("\n")}` : "Review memory already initialized.",
+					s.qmdStatus === "registered" ? "QMD review memory is ready." : `QMD review memory is not ready: ${s.qmdStatus}.`,
 					"",
-					"Memory locations under ~/.pi, shared across repos without writing into repo working trees:",
-					`- Global pool: ${s.globalDir}`,
-					`- Current repo bucket: ${s.repoDir}`,
+					`Knowledge vault: ${s.knowledgeRoot}`,
+					`Global patterns: ${s.globalPatternUri}`,
+					`Current repo patterns: ${s.repoPatternUri}/`,
 					"",
 					nextStepsText(),
 				].join("\n");
@@ -465,14 +546,14 @@ export default function (pi: ExtensionAPI) {
 			if (subcommand === "prompt") {
 				const rawScope = rest.join(" ").trim();
 				const scope = rawScope ? (/^\d+$/.test(rawScope) ? `PR ${rawScope}` : rawScope) : "current changes";
-				const prompt = reviewPrompt(scope);
+				const prompt = reviewPrompt(scope, ctx.cwd);
 				ctx.ui.setEditorText(prompt);
 				displayMessage(pi, ctx, "Review prompt placed in editor. Submit it to run the review.");
 				return;
 			}
 
 			if (/^\d+$/.test(subcommand)) {
-				const prompt = reviewPrompt(`PR ${subcommand}`);
+				const prompt = reviewPrompt(`PR ${subcommand}`, ctx.cwd);
 				ctx.ui.setEditorText(prompt);
 				displayMessage(pi, ctx, "Review prompt placed in editor. Submit it to run the review.");
 				return;
@@ -484,12 +565,8 @@ export default function (pi: ExtensionAPI) {
 					notifyOrDisplay(pi, ctx, "Usage: /elixir-review learn <PR-or-label>");
 					return;
 				}
-				const created = [...ensureMemoryDir(GLOBAL_MEMORY_DIR), ...ensureMemoryDir(repoMemoryDir(ctx.cwd))];
 				ctx.ui.setEditorText(learningPrompt(ctx.cwd, label));
-				displayMessage(pi, ctx, [
-					"Learning prompt placed in editor. Submit it to persist durable review-memory entries if warranted.",
-					...(created.length > 0 ? ["", `Initialized memory paths:\n${created.map((p) => `- ${p}`).join("\n")}`] : []),
-				].join("\n"));
+				displayMessage(pi, ctx, "Learning prompt placed in editor. Submit it to persist durable review-memory entries if warranted.");
 				return;
 			}
 
@@ -500,65 +577,63 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "review_memory",
 		label: "Review Memory",
-		description: "Read or explicitly persist Elixir review memory patterns and reflections.",
-		promptSnippet: "Read Elixir review memory, or append patterns/write reflections only after explicit persistence approval.",
+		description: "Read QMD-backed review memory or explicitly persist new QMD notes.",
+		promptSnippet: "Read QMD-backed Elixir review memory, or create new QMD notes only after explicit persistence approval.",
 		promptGuidelines: [
 			"Ordinary reviews may use review_memory status/read only.",
 			"Use append_pattern or write_reflection only after /elixir-review learn or another explicit user persistence request.",
-			"Persist concise, non-sensitive reusable lessons; never overwrite existing memory.",
+			"Persist concise, non-sensitive reusable lessons as new QMD Markdown notes; never overwrite existing notes.",
 		],
 		parameters: Type.Object({
 			action: Type.Union([Type.Literal("status"), Type.Literal("read"), Type.Literal("append_pattern"), Type.Literal("write_reflection")]),
 			scope: Type.Optional(Type.Union([Type.Literal("global"), Type.Literal("repo"), Type.Literal("both")])),
-			pattern: Type.Optional(Type.String({ description: "Markdown pattern text to append when action is append_pattern." })),
-			label: Type.Optional(Type.String({ description: "PR number or label when action is write_reflection." })),
-			reflection: Type.Optional(Type.String({ description: "Markdown reflection text when action is write_reflection." })),
+			pattern: Type.Optional(Type.String({ description: "Markdown pattern text for a new QMD note." })),
+			label: Type.Optional(Type.String({ description: "PR number or label for a reflection note." })),
+			reflection: Type.Optional(Type.String({ description: "Markdown reflection text for a new QMD note." })),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
 			const readScope = params.scope || "both";
-			const readDirs = [
-				...(readScope === "global" || readScope === "both" ? [GLOBAL_MEMORY_DIR] : []),
-				...(readScope === "repo" || readScope === "both" ? [repoMemoryDir(ctx.cwd)] : []),
-			];
 
 			if (params.action === "status") {
 				return { content: [{ type: "text", text: statusText(ctx.cwd) }], details: {} };
 			}
 
 			if (params.action === "read") {
-				const chunks = readDirs.map((dir) => {
-					const md = join(dir, "patterns.md");
-					const json = join(dir, "patterns.json");
-					return [`# ${dir}`, existsSync(md) ? readFileSync(md, "utf-8") : "patterns.md missing", existsSync(json) ? readFileSync(json, "utf-8") : "patterns.json missing"].join("\n\n");
-				});
-				return { content: [{ type: "text", text: chunks.join("\n\n---\n\n") }], details: {} };
+				return {
+					content: [{ type: "text", text: readQmdMemory(ctx.cwd, readScope) }],
+					details: { scope: readScope, source: "qmd" },
+				};
 			}
 
 			if (params.action === "write_reflection") {
 				if (!params.label?.trim() || !params.reflection?.trim()) {
 					return { content: [{ type: "text", text: "write_reflection requires label and reflection text." }], details: { error: "missing_reflection" } };
 				}
-				const reflectionScope = params.scope === "global" ? "global" : "repo";
-				const path = writeReflection(ctx.cwd, params.label.trim(), params.reflection.trim(), reflectionScope);
-				return { content: [{ type: "text", text: `Wrote reflection to ${path}` }], details: { path, scope: reflectionScope } };
+
+				try {
+					const reflectionScope = params.scope === "global" ? "global" : "repo";
+					const path = writeReflection(ctx.cwd, params.label.trim(), params.reflection.trim(), reflectionScope);
+					const refreshError = refreshQmd();
+					const suffix = refreshError ? ` QMD refresh failed: ${refreshError}` : " QMD index refreshed.";
+					return { content: [{ type: "text", text: `Wrote reflection to ${path}.${suffix}` }], details: { path, scope: reflectionScope, refreshError } };
+				} catch (error) {
+					return { content: [{ type: "text", text: `Could not write reflection: ${String(error)}` }], details: { error: "write_failed" } };
+				}
 			}
 
 			if (!params.pattern?.trim()) {
 				return { content: [{ type: "text", text: "append_pattern requires pattern text." }], details: { error: "missing_pattern" } };
 			}
-			const pattern = params.pattern.trim();
-			const appendScope = params.scope || "repo";
-			const appendDirs = [
-				...(appendScope === "global" || appendScope === "both" ? [GLOBAL_MEMORY_DIR] : []),
-				...(appendScope === "repo" || appendScope === "both" ? [repoMemoryDir(ctx.cwd)] : []),
-			];
-			const paths = appendDirs.map((dir) => {
-				ensureMemoryDir(dir);
-				const path = join(dir, "patterns.md");
-				appendFileSync(path, `\n${pattern}\n`, "utf-8");
-				return path;
-			});
-			return { content: [{ type: "text", text: `Appended pattern to ${paths.join(", ")}` }], details: { paths } };
+
+			try {
+				const appendScope = params.scope || "repo";
+				const paths = writePattern(ctx.cwd, params.pattern.trim(), appendScope);
+				const refreshError = refreshQmd();
+				const suffix = refreshError ? ` QMD refresh failed: ${refreshError}` : " QMD index refreshed.";
+				return { content: [{ type: "text", text: `Wrote new review pattern note(s) to ${paths.join(", ")}.${suffix}` }], details: { paths, scope: appendScope, refreshError } };
+			} catch (error) {
+				return { content: [{ type: "text", text: `Could not write review pattern: ${String(error)}` }], details: { error: "write_failed" } };
+			}
 		},
 	});
 }
