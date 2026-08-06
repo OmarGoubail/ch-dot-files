@@ -12,6 +12,7 @@ opt.sessionoptions = { "buffers", "curdir", "resize", "tabpages", "terminal", "w
 if vim.env.SSH_CONNECTION then
   opt.clipboard = ""
   local osc52 = require("vim.ui.clipboard.osc52")
+  local copy_to_clipboard = osc52.copy("+")
   local function empty_paste()
     return { {}, "v" }
   end
@@ -19,7 +20,7 @@ if vim.env.SSH_CONNECTION then
   vim.g.clipboard = {
     name = "OSC 52 (copy only)",
     copy = {
-      ["+"] = osc52.copy("+"),
+      ["+"] = copy_to_clipboard,
       ["*"] = osc52.copy("*"),
     },
     paste = {
@@ -27,6 +28,16 @@ if vim.env.SSH_CONNECTION then
       ["*"] = empty_paste,
     },
   }
+
+  vim.api.nvim_create_autocmd("TextYankPost", {
+    group = vim.api.nvim_create_augroup("ssh_clipboard_yank", { clear = true }),
+    callback = function()
+      local event = vim.v.event
+      if event.operator == "y" and event.regname == "" then
+        copy_to_clipboard(event.regcontents, event.regtype)
+      end
+    end,
+  })
 else
   vim.schedule(function()
     opt.clipboard = "unnamedplus"
