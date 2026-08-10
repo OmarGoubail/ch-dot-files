@@ -6,7 +6,8 @@
  */
 
 import { lstatSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { isAbsolute, relative, resolve } from 'node:path'
 import type {
   ExtensionAPI,
   SessionBeforeSwitchEvent,
@@ -150,12 +151,6 @@ function matched(
 }
 
 const PREFIX_WRAPPERS = new Set(['sudo', 'command', 'env', 'noglob'])
-const DYNAMIC_COMMAND_RULE = exact(
-  ['<dynamic>'],
-  'Run shell command with dynamic protected-tool arguments'
-)
-const DYNAMIC_COMMAND_NAME_RULE = exact(['<dynamic-command-name>'], 'Run dynamic shell command')
-const PARSE_ERROR_RULE = exact(['<parse-error>'], 'Run unparsable shell command')
 
 export default function (pi: ExtensionAPI) {
   let commandRules = DEFAULT_COMMAND_RULES
@@ -248,7 +243,6 @@ export function matchCommandRule(
   cwd = process.cwd()
 ): CommandRule | undefined {
   const parsed = parseCommand(command)
-  if (parsed.parseFailed) return PARSE_ERROR_RULE
 
   for (const invocation of parsed.invocations) {
     const normalized = normalizeInvocation(invocation.argv)
@@ -257,9 +251,6 @@ export function matchCommandRule(
       return startsWithArgv(comparable, rule.argv) && (rule.matches?.(comparable, cwd) ?? true)
     })
     if (match) return match
-
-    if (invocation.dynamicName) return DYNAMIC_COMMAND_NAME_RULE
-    if (invocation.dynamic && isProtectedToolInvocation(normalized)) return DYNAMIC_COMMAND_RULE
   }
 }
 
@@ -269,24 +260,18 @@ export function parseInvocations(command: string): string[][] {
 
 type ParsedInvocation = {
   argv: string[]
-  dynamic: boolean
-  dynamicName: boolean
 }
 
 type ParsedCommand = {
   invocations: ParsedInvocation[]
-  parseFailed: boolean
 }
 
 function parseCommand(command: string): ParsedCommand {
   try {
     const script = parseShell(command)
-    return {
-      invocations: collectInvocationsFromScript(script),
-      parseFailed: Boolean(script.errors?.length)
-    }
+    return { invocations: collectInvocationsFromScript(script) }
   } catch {
-    return { invocations: [], parseFailed: true }
+    return { invocations: [] }
   }
 }
 
@@ -308,15 +293,7 @@ function collectInvocationsFromNode(node: Node | undefined): ParsedInvocation[] 
       const words = [node.name, ...node.suffix].filter((word): word is Word => Boolean(word))
       const argv = words.map((word) => word.value)
       return [
-        ...(argv.length > 0
-          ? [
-              {
-                argv,
-                dynamic: words.some((word) => !isStaticWord(word)),
-                dynamicName: Boolean(node.name && !isStaticWord(node.name))
-              }
-            ]
-          : []),
+        ...(argv.length > 0 ? [{ argv }] : []),
         ...words.flatMap(collectInvocationsFromWord),
         ...node.prefix.flatMap((assignment) => collectInvocationsFromWord(assignment.value)),
         ...collectInvocationsFromRedirects(node.redirects)
@@ -462,24 +439,6 @@ function collectInvocationsFromTestExpression(expression: unknown): ParsedInvoca
     }
   }
   return invocations
-}
-
-function isStaticWord(word: Word): boolean {
-  return !word.parts || word.parts.every(isStaticWordPart)
-}
-
-function isStaticWordPart(part: WordPart): boolean {
-  switch (part.type) {
-    case 'Literal':
-    case 'SingleQuoted':
-    case 'AnsiCQuoted':
-      return true
-    case 'DoubleQuoted':
-    case 'LocaleString':
-      return part.parts.every(isStaticWordPart)
-    default:
-      return false
-  }
 }
 
 function isWord(value: unknown): value is Word {
@@ -668,18 +627,30 @@ function isBroadRecursiveRemoval(argv: string[], cwd: string): boolean {
 }
 
 function isBroadRemovalTarget(target: string, cwd: string): boolean {
+  const resolvedTarget = resolveRemovalTarget(target, cwd)
+  if (isTemporaryRemovalTarget(resolvedTarget, cwd)) return false
   if (['/', '~', '~/', '.', './', '..', '../'].includes(target)) return true
   if (/[?*{}\[\]]/.test(target) || target.endsWith('/') || /[$`]/.test(target)) return true
-
-  const resolvedTarget = target.startsWith('~/') && process.env.HOME
-    ? resolve(process.env.HOME, target.slice(2))
-    : resolve(cwd, target)
-
   try {
     return lstatSync(resolvedTarget).isDirectory()
   } catch {
     return false
   }
+}
+
+function resolveRemovalTarget(target: string, cwd: string): string {
+  return target.startsWith('~/') && process.env.HOME
+    ? resolve(process.env.HOME, target.slice(2))
+    : resolve(cwd, target)
+}
+
+function isTemporaryRemovalTarget(target: string, cwd: string): boolean {
+  return [resolve(cwd, 'tmp'), resolve(tmpdir())].some((root) => isWithinDirectory(target, root))
+}
+
+function isWithinDirectory(target: string, root: string): boolean {
+  const relativeTarget = relative(root, target)
+  return relativeTarget === '' || (!relativeTarget.startsWith('..') && !isAbsolute(relativeTarget))
 }
 
 function isShellCommandString(argv: string[]): boolean {

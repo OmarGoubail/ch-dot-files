@@ -1,0 +1,14 @@
+git:
+  paging:
+    colorArg: always
+    pager: theme delta --paging=never
+
+{{- if or (eq .chezmoi.osRelease.id "arch") (eq .chezmoi.osRelease.idLike "arch") }}
+os:
+  copyToClipboardCmd: >-
+    if test -n "$SSH_CONNECTION"
+      printf "\033]52;c;$(printf {{ "{{text}}" }} | base64 -w 0)\a" > /dev/tty
+    else
+      printf {{ "{{text}}" }} | wl-copy
+    end
+{{- end }}

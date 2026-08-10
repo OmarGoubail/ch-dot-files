@@ -14,15 +14,15 @@
           "thinking": "high"
         },
         "reviewer": {
-          "model": "openai-codex-work/gpt-5.6-luna",
-          "thinking": "xhigh"
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
+          "thinking": "high"
         },
         "scout": {
           "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
           "thinking": "off"
         },
         "worker": {
-          "model": "openai-codex-work/gpt-5.6-luna",
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
           "thinking": "high"
         },
         "researcher": {
@@ -52,7 +52,7 @@
           "thinking": "off"
         },
         "worker": {
-          "model": "openai-codex-personal/gpt-5.6-luna",
+          "model": "opencode-go/deepseek-v4-flash",
           "thinking": "high"
         },
         "researcher": {
