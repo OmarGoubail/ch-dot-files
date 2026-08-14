@@ -531,10 +531,35 @@ function startsWithArgv(argv: string[], prefix: string[]): boolean {
 
 function isMutatingGhApi(argv: string[]): boolean {
   const method = getOptionValue(argv, ['--method', '-X'])?.toUpperCase()
-  if (method && method !== 'GET') return true
+  if (method && method !== 'GET') return !isReadOnlyGhGraphqlQuery(argv)
   if (method === 'GET') return false
-
+  if (isReadOnlyGhGraphqlQuery(argv)) return false
   return argv.some((arg) => ['--field', '-f', '--raw-field', '-F'].includes(arg))
+}
+
+function isReadOnlyGhGraphqlQuery(argv: string[]): boolean {
+  if (!argv.slice(2).includes('graphql')) return false
+  const query = getGhApiField(argv, 'query')
+  if (!query) return false
+  return !/\bmutation(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*\{/i.test(query)
+}
+
+function getGhApiField(argv: string[], name: string): string | undefined {
+  const flags = ['--field', '-f', '--raw-field', '-F']
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index] ?? ''
+    if (flags.includes(arg)) {
+      const value = argv[index + 1]
+      if (value?.startsWith(`${name}=`)) return value.slice(name.length + 1)
+    }
+    for (const flag of flags) {
+      const prefix = `${flag}=`
+      if (arg.startsWith(prefix)) {
+        const value = arg.slice(prefix.length)
+        if (value.startsWith(`${name}=`)) return value.slice(name.length + 1)
+      }
+    }
+  }
 }
 
 function isMutatingGhSubcommand(argv: string[]): boolean {

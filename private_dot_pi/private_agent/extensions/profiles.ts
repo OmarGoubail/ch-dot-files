@@ -34,6 +34,7 @@ type ModelSpec = {
 
 const CONFIG_PATH = join(homedir(), ".pi", "agent", "profiles.json");
 const STATE_PATH = join(homedir(), ".pi", "agent", "profile-state.json");
+const SETTINGS_PATH = join(homedir(), ".pi", "agent", "settings.json");
 const THINKING_LEVELS = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -237,6 +238,7 @@ export default function profiles(pi: ExtensionAPI): void {
 		}
 
 		currentProfile = profileName;
+		syncSubagentOverrides(profileName);
 		if (ctx.hasUI) ctx.ui.setStatus("profile", `Profile: ${currentProfile}`);
 
 		const sticky = state[profileName];
@@ -292,6 +294,46 @@ export default function profiles(pi: ExtensionAPI): void {
 		const policy = config.profiles[currentProfile]?.subagents[agentName];
 		if (!policy?.model) return undefined;
 		return policy.thinking ? `${policy.model}:${policy.thinking}` : policy.model;
+	}
+	function syncSubagentOverrides(profileName: string): void {
+		const profile = config.profiles[profileName];
+		if (!profile) return;
+		const entries = Object.entries(profile.subagents);
+		if (entries.length === 0) return;
+
+		let settings: JsonRecord = {};
+		if (existsSync(SETTINGS_PATH)) {
+			try {
+				const parsed = JSON.parse(readFileSync(SETTINGS_PATH, "utf8")) as unknown;
+				if (isRecord(parsed)) settings = parsed;
+			} catch {
+				return;
+			}
+		}
+
+		const subagents: JsonRecord = isRecord(settings.subagents) ? settings.subagents : {};
+		const existingOverrides: JsonRecord = isRecord(subagents.agentOverrides) ? subagents.agentOverrides : {};
+		const nextOverrides: JsonRecord = { ...existingOverrides };
+
+		for (const [name, policy] of entries) {
+			if (!policy.model) continue;
+			nextOverrides[name] = {
+				...(isRecord(nextOverrides[name]) ? nextOverrides[name] : {}),
+				model: policy.model,
+				...(policy.thinking ? { thinking: policy.thinking } : {}),
+			};
+		}
+
+		settings.subagents = {
+			...subagents,
+			agentOverrides: nextOverrides,
+		};
+
+		try {
+			writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2));
+		} catch {
+			// Best-effort sync; ignore write failures.
+		}
 	}
 
 	function patchTask(task: JsonRecord, ctx: ExtensionContext): boolean {
