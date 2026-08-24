@@ -4,6 +4,10 @@
     "work": {
       "model": "openai-codex-work/gpt-5.6-sol",
       "thinking": "medium",
+      "allowed_providers": [
+        "openai-codex-work",
+        "fireworks"
+      ],
       "subagents": {
         "oracle": {
           "model": "openai-codex-work/gpt-5.6-sol",
@@ -14,7 +18,7 @@
           "thinking": "high"
         },
         "reviewer": {
-          "model": "openai-codex-personal/gpt-5.6-luna",
+          "model": "openai-codex-work/gpt-5.6-luna",
           "thinking": "xhigh"
         },
         "scout": {
@@ -34,6 +38,10 @@
     "personal": {
       "model": "openai-codex-personal/gpt-5.6-luna",
       "thinking": "xhigh",
+      "allowed_providers": [
+        "openai-codex-personal",
+        "opencode-go"
+      ],
       "subagents": {
         "oracle": {
           "model": "openai-codex-personal/gpt-5.6-sol",

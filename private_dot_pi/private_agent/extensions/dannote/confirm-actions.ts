@@ -780,7 +780,7 @@ function isFlag(arg: string): boolean {
   return arg.startsWith('-') && arg !== '-'
 }
 
-function loadCommandRules(cwd: string): CommandRule[] {
+export function loadCommandRules(cwd: string): CommandRule[] {
   const settings = readLayeredSettings(cwd)
   const groups = Object.assign({}, ...settings.map((item) => readConfirmActionGroups(item)))
   const customRules = settings.flatMap(readCommandRules)

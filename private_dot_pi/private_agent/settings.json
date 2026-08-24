@@ -9,7 +9,6 @@
     "npm:@ff-labs/pi-fff@0.8.1",
     "npm:pi-vim",
     "npm:pi-hashline-edit",
-    "npm:pi-subagents",
     "npm:pi-elixir",
     "npm:pi-context",
     "npm:pi-btw"
@@ -18,11 +17,8 @@
   "pi-codex-fast": {
     "enabled": false
   },
-  "subagents": {
-    "disableBuiltins": false
-  },
   "theme": "theme-current",
-  "extensions": ["extensions/dannote", "extensions/pi-codex-compaction"],
+  "extensions": ["extensions/dannote", "extensions/pi-codex-compaction", "extensions/herdr-subagents"],
   "confirmActionGroups": {
     "execution": false
   },
