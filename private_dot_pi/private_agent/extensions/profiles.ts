@@ -176,6 +176,7 @@ function notify(ctx: ExtensionContext, message: string, type: "info" | "warning"
 }
 
 export default function profiles(pi: ExtensionAPI): void {
+	if (process.env.PI_SUBAGENT_CHILD === "1") return;
 	pi.registerFlag("profile", {
 		description: "Initial account profile (for example, work or personal)",
 		type: "string",
