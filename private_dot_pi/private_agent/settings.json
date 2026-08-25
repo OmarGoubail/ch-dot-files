@@ -1,8 +1,10 @@
 {
-  "lastChangelogVersion": "0.80.3",
+  "lastChangelogVersion": "0.84.3",
   "defaultProvider": "fireworks",
   "defaultModel": "accounts/fireworks/models/glm-5p2",
-  "npmCommand": ["npm"],
+  "npmCommand": [
+    "npm"
+  ],
   "packages": [
     "npm:pi-web-access",
     "npm:pi-notify",
@@ -18,7 +20,11 @@
     "enabled": false
   },
   "theme": "theme-current",
-  "extensions": ["extensions/dannote", "extensions/pi-codex-compaction", "extensions/herdr-subagents"],
+  "extensions": [
+    "extensions/dannote",
+    "extensions/pi-codex-compaction",
+    "extensions/herdr-subagents"
+  ],
   "confirmActionGroups": {
     "execution": false
   },
