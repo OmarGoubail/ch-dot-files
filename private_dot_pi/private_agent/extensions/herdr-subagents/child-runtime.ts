@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import herdrAgentState from "../herdr-agent-state.ts";
 import { loadCommandRules, matchCommandRule } from "../dannote/confirm-actions.ts";
@@ -53,6 +53,7 @@ export default function childRuntime(pi: ExtensionAPI): void {
 	if (process.env.HERDR_SUBAGENT_CHILD !== "1") return;
 
 	const statePath = process.env.HERDR_SUBAGENT_STATE_PATH;
+	const promptPath = process.env.HERDR_SUBAGENT_PROMPT_PATH;
 	const expectedModel = process.env.HERDR_SUBAGENT_EXPECTED_MODEL ?? "";
 	const sessionId = process.env.HERDR_SUBAGENT_SESSION_ID ?? "";
 	const maxTurns = envInteger("HERDR_SUBAGENT_MAX_TURNS", 15);
@@ -88,13 +89,31 @@ export default function childRuntime(pi: ExtensionAPI): void {
 		}
 	};
 
-	const failModel = (ctx: ExtensionContext, error: string) => {
+	const failChild = (ctx: ExtensionContext, error: string) => {
 		state.status = "failed";
 		state.error = error;
 		save();
 		ctx.ui.notify(error, "error");
 		ctx.abort();
 	};
+
+	pi.registerCommand("herdr-delegate", {
+		description: "Load and run the parent-owned delegation prompt",
+		handler: async (_args, ctx) => {
+			if (!promptPath) {
+				failChild(ctx, "Child delegation prompt path is missing.");
+				return;
+			}
+			try {
+				const prompt = readFileSync(promptPath, "utf8");
+				if (!prompt.trim()) throw new Error("Delegation prompt is empty.");
+				pi.sendUserMessage(prompt);
+			} catch (error) {
+				const detail = error instanceof Error ? error.message : String(error);
+				failChild(ctx, `Could not load child delegation prompt: ${detail}`);
+			}
+		},
+	});
 
 	pi.on("session_start", (_event, ctx) => {
 		commandRules = loadCommandRules(ctx.cwd);
@@ -108,7 +127,7 @@ export default function childRuntime(pi: ExtensionAPI): void {
 	pi.on("before_agent_start", (_event, ctx) => {
 		const error = verifyModel(ctx);
 		if (error) {
-			failModel(ctx, error);
+			failChild(ctx, error);
 			return;
 		}
 		state.status = "running";
@@ -117,7 +136,7 @@ export default function childRuntime(pi: ExtensionAPI): void {
 
 	pi.on("model_select", (_event, ctx) => {
 		const error = verifyModel(ctx);
-		if (error) failModel(ctx, error);
+		if (error) failChild(ctx, error);
 		else save();
 	});
 

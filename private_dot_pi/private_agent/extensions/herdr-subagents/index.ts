@@ -10,7 +10,7 @@ import { getProfileRegistry, modelPolicyError, parseModelSpec, profileSelectionF
 import { KeyedMutex, Semaphore } from "./concurrency.ts";
 import { HerdrClient, type HerdrTab } from "./herdr.ts";
 import { formatCost, formatUsage, latestBySession, nextSegment, recordsFromEntries, RUN_ENTRY_TYPE, totalUsage } from "./ledger.ts";
-import { assertDelegationContextFits, buildInitialPrompt, filteredConversation, runtimeSystemPrompt } from "./prompt.ts";
+import { assertDelegationContextFits, buildInitialPrompt, delegationConversation, runtimeSystemPrompt } from "./prompt.ts";
 import { loadRole, loadRoles } from "./roles.ts";
 import type { AgentRole, AgentRunRecord, AgentStatus, ChildState, RunningAgent } from "./types.ts";
 import { EMPTY_USAGE } from "./types.ts";
@@ -152,11 +152,15 @@ function configuredPolicy(role: string, ctx: ExtensionContext, profileName?: str
 	};
 }
 
-function createSystemPromptFile(role: AgentRole, id: string): string {
+function createPrivateRuntimeFile(name: string, content: string): string {
 	mkdirSync(RUNTIME_DIR, { recursive: true, mode: 0o700 });
-	const path = join(RUNTIME_DIR, `${id}.md`);
-	writeFileSync(path, `${role.systemPrompt}\n\n${runtimeSystemPrompt(role)}\n`, { mode: 0o600 });
+	const path = join(RUNTIME_DIR, name);
+	writeFileSync(path, content, { mode: 0o600 });
 	return path;
+}
+
+function createSystemPromptFile(role: AgentRole, id: string): string {
+	return createPrivateRuntimeFile(`${id}.system.md`, `${role.systemPrompt}\n\n${runtimeSystemPrompt(role)}\n`);
 }
 
 function childArgs(input: {
@@ -237,6 +241,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 		const runtimeId = `${input.sessionId}-${input.segment}-${randomUUID()}`;
 		const statePath = join(RUNTIME_DIR, `${runtimeId}.json`);
 		const systemPromptPath = createSystemPromptFile(input.role, runtimeId);
+		const promptPath = createPrivateRuntimeFile(`${runtimeId}.prompt.md`, input.prompt);
 
 		try {
 			releases.push(await sessionLocks.acquire(input.sessionId, linked.signal));
@@ -272,6 +277,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 					HERDR_SUBAGENT_ROLE: input.role.name,
 					HERDR_SUBAGENT_SESSION_ID: input.sessionId,
 					HERDR_SUBAGENT_STATE_PATH: statePath,
+					HERDR_SUBAGENT_PROMPT_PATH: promptPath,
 					HERDR_SUBAGENT_EXPECTED_MODEL: input.policy.policy.model,
 					HERDR_SUBAGENT_ALLOWED_PROVIDERS: JSON.stringify(input.policy.profile.allowedProviders),
 					HERDR_SUBAGENT_MAX_TURNS: String(input.role.maxTurns),
@@ -294,9 +300,8 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 				}),
 				signal: linked.signal,
 			});
-			await herdr.prompt({
+			await herdr.delegate({
 				target: agentName,
-				text: input.prompt,
 				timeoutMs: input.role.timeoutMinutes * 60_000,
 				signal: linked.signal,
 			});
@@ -309,6 +314,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 				try { await herdr.closeTab(tabId); } catch (error) { launchError ??= error; }
 			}
 			try { rmSync(systemPromptPath, { force: true }); } catch {}
+			try { rmSync(promptPath, { force: true }); } catch {}
 			if (registered) running.delete(input.sessionId);
 			updateFooter(input.ctx);
 			for (const release of releases.reverse()) release();
@@ -347,7 +353,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 		}
 		const role = loadRole(params.agent);
 		const policy = configuredPolicy(role.name, ctx);
-		const conversation = filteredConversation(ctx.sessionManager.getBranch());
+		const conversation = delegationConversation(ctx.sessionManager);
 		const prompt = buildInitialPrompt({
 			conversation,
 			task: params.task,
@@ -405,7 +411,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 			throw new Error(`Child session '${record.sessionId}' has no readable persisted session file.`);
 		}
 		const session = SessionManager.open(record.sessionPath);
-		return response(record, filteredConversation(session.getBranch()));
+		return response(record, delegationConversation(session));
 	};
 
 	const reopen = async (record: AgentRunRecord, ctx: ExtensionContext) => {

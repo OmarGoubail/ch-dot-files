@@ -1,15 +1,51 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertDelegationContextFits, filteredConversation } from "../prompt.ts";
+import { assertDelegationContextFits, delegationConversation, filteredConversation } from "../prompt.ts";
 import { KeyedMutex, Semaphore } from "../concurrency.ts";
 
-test("conversation handoff keeps user and assistant text but strips tools and results", () => {
-	const entries = [
-		{ type: "message", message: { role: "user", content: [{ type: "text", text: "question" }] } },
-		{ type: "message", message: { role: "assistant", content: [{ type: "text", text: "answer" }, { type: "toolCall", name: "read", arguments: { path: "secret" } }] } },
-		{ type: "message", message: { role: "toolResult", content: [{ type: "text", text: "file contents" }] } },
+test("conversation handoff keeps summaries, user, and assistant text but strips tools and results", () => {
+	const messages = [
+		{ role: "compactionSummary", summary: "Earlier work was compacted." },
+		{ role: "branchSummary", summary: "The active branch was restored." },
+		{ role: "user", content: [{ type: "text", text: "question" }] },
+		{ role: "assistant", content: [{ type: "text", text: "answer" }, { type: "toolCall", name: "read", arguments: { path: "secret" } }] },
+		{ role: "toolResult", content: [{ type: "text", text: "file contents" }] },
 	] as any;
-	assert.equal(filteredConversation(entries), "User:\nquestion\n\nAssistant:\nanswer");
+	assert.equal(
+		filteredConversation(messages),
+		"Earlier conversation summary:\nEarlier work was compacted.\n\nBranch summary:\nThe active branch was restored.\n\nUser:\nquestion\n\nAssistant:\nanswer",
+	);
+});
+
+test("conversation handoff uses Pi's compaction-aware context", () => {
+	const sessionManager = {
+		buildContextEntries: () => [
+			{ type: "compaction", summary: "condensed history" },
+			{ type: "message", message: { role: "user", content: "effective context" } },
+			{ type: "message", message: { role: "toolResult", content: "hidden result" } },
+		],
+		getBranch: () => { throw new Error("raw branch must not be read"); },
+	};
+	assert.equal(
+		delegationConversation(sessionManager),
+		"Earlier conversation summary:\ncondensed history\n\nUser:\neffective context",
+	);
+});
+
+test("conversation handoff keeps the newest complete exchanges under 70k estimated tokens", () => {
+	const messages = [
+		{ role: "compactionSummary", summary: "keep-summary" },
+		{ role: "user", content: `old-marker-${"x".repeat(200_000)}` },
+		{ role: "assistant", content: `old-answer-${"x".repeat(100_000)}` },
+		{ role: "user", content: "latest-question" },
+		{ role: "assistant", content: "latest-answer" },
+	];
+	const result = filteredConversation(messages);
+	assert.match(result, /Earlier conversation summary:\nkeep-summary/);
+	assert.match(result, /Earlier conversation omitted/);
+	assert.doesNotMatch(result, /old-marker/);
+	assert.match(result, /User:\nlatest-question\n\nAssistant:\nlatest-answer/);
+	assert.ok(result.length <= 280_000);
 });
 
 test("delegation context fails explicitly above the 100k-token estimate", () => {

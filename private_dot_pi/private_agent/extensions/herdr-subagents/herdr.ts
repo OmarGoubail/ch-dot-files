@@ -106,9 +106,9 @@ export class HerdrClient {
 		);
 	}
 
-	async prompt(input: { target: string; text: string; timeoutMs: number; signal?: AbortSignal }): Promise<void> {
+	async delegate(input: { target: string; timeoutMs: number; signal?: AbortSignal }): Promise<void> {
 		await this.run(
-			["agent", "prompt", input.target, input.text, "--wait", "--timeout", String(input.timeoutMs)],
+			["agent", "prompt", input.target, "/herdr-delegate", "--wait", "--timeout", String(input.timeoutMs)],
 			{ signal: input.signal, timeoutMs: input.timeoutMs + 10_000 },
 		);
 	}
