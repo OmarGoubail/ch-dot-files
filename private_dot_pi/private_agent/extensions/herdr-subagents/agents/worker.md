@@ -2,7 +2,7 @@
 name: worker
 description: Bounded implementation, repair, and verification in one writer lane
 tools: read,grep,find,bash,edit,write
-maxTurns: 30
+maxTurns: 80
 timeoutMinutes: 25
 writer: true
 ---

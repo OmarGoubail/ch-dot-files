@@ -2,7 +2,7 @@
 name: scout
 description: Fast read-only codebase reconnaissance and context retrieval
 tools: read,grep,find,bash
-maxTurns: 10
+maxTurns: 20
 timeoutMinutes: 25
 writer: false
 ---

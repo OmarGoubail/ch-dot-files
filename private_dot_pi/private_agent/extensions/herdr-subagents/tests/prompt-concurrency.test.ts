@@ -2,6 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { assertDelegationContextFits, delegationConversation, filteredConversation } from "../prompt.ts";
 import { KeyedMutex, Semaphore } from "../concurrency.ts";
+import { readFileSync } from "node:fs";
+
+function roleMaxTurns(name: string): number {
+	const source = readFileSync(new URL(`../agents/${name}.md`, import.meta.url), "utf8");
+	const match = source.match(/^maxTurns:\s*(\d+)$/m);
+	assert.ok(match, `${name} must define maxTurns`);
+	return Number(match[1]);
+}
 
 test("conversation handoff keeps summaries, user, and assistant text but strips tools and results", () => {
 	const messages = [
@@ -50,6 +58,12 @@ test("conversation handoff keeps the newest complete exchanges under 70k estimat
 
 test("delegation context fails explicitly above the 100k-token estimate", () => {
 	assert.throws(() => assertDelegationContextFits("x".repeat(400_001)), /above the 100,000-token/);
+});
+
+test("role turn budgets reflect observed session needs", () => {
+	assert.equal(roleMaxTurns("worker"), 80);
+	assert.equal(roleMaxTurns("scout"), 20);
+	assert.equal(roleMaxTurns("oracle"), 15);
 });
 
 test("semaphore queues above its configured concurrency", async () => {
