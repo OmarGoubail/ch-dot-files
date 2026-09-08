@@ -47,6 +47,11 @@ describe("Review Zen", () => {
     expect(frame).toContain("Accept and dispatch the request")
     expect(frame).toContain("Elixir map pattern")
     expect(frame).toContain("read the transfer parameters")
+    const rows = frame.split("\n")
+    const headerRow = rows.findIndex((row) => row.includes("TransferController.create/2"))
+    const sourceRow = rows.findIndex((row) => row.includes(" SOURCE "))
+    expect(sourceRow - headerRow).toBe(2)
+    expect(rows[headerRow + 1].trim()).toBe("")
   })
 
   test("moves one focus block and updates both explanations", async () => {

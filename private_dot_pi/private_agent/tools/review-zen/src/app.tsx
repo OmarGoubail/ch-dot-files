@@ -369,9 +369,9 @@ export function App({ bundle, theme }: { bundle: ReviewBundle; theme: ReviewThem
   const showMap = mapOpen && dimensions.width >= 105
   const workspaceWidth = Math.max(68, Math.min(148, dimensions.width - 2))
   const mainWidth = showMap ? workspaceWidth - 30 : Math.min(118, workspaceWidth)
-  const contentHeight = Math.max(18, dimensions.height - 2)
+  const contentHeight = Math.max(17, dimensions.height - 3)
   const sourceHeight = Math.max(11, Math.min(Math.floor(contentHeight * 0.53), frame.lines.length + 4))
-  const lowerHeight = Math.max(7, contentHeight - sourceHeight)
+  const lowerHeight = Math.max(6, contentHeight - sourceHeight)
   const detailsSideBySide = mainWidth >= 100
   const languageWidth = detailsSideBySide ? Math.floor((mainWidth - 1) / 2) : mainWidth
   const intentWidth = detailsSideBySide ? mainWidth - languageWidth - 1 : mainWidth
@@ -491,6 +491,7 @@ export function App({ bundle, theme }: { bundle: ReviewBundle; theme: ReviewThem
       <box width="100%" height={1} paddingLeft={1} paddingRight={1} justifyContent="center">
         <text fg={theme.muted} selectable={false}>{compactName(header, dimensions.width - 2)}</text>
       </box>
+      <box height={1} />
       <box height={contentHeight} width="100%" flexDirection="row" justifyContent="center" overflow="hidden">
         <box width={mainWidth} height="100%" flexDirection="column">
           <box
