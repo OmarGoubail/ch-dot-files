@@ -6,7 +6,10 @@ import { loadBundle } from "./bundle"
 import { loadTheme } from "./theme"
 
 const usage = `Usage: review-zen <review.json> [--theme <theme.json>]
+       review-zen --check <review.json>
        review-zen --demo [--theme <theme.json>]
+       review-zen --demo-ui [--theme <theme.json>]
+       cat review.json | review-zen -
 
 Keys:
   n/p       Next or previous review stop
@@ -22,11 +25,13 @@ Keys:
 type CliOptions = {
   bundlePath: string
   themePath?: string
+  check: boolean
 }
 
 export function parseArgs(args: string[]): CliOptions {
   let bundlePath: string | undefined
   let themePath: string | undefined
+  let check = false
 
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index]
@@ -34,8 +39,16 @@ export function parseArgs(args: string[]): CliOptions {
       process.stdout.write(`${usage}\n`)
       process.exit(0)
     }
+    if (argument === "--check") {
+      check = true
+      continue
+    }
     if (argument === "--demo") {
       bundlePath = resolve(import.meta.dir, "../examples/transfer-review.json")
+      continue
+    }
+    if (argument === "--demo-ui") {
+      bundlePath = resolve(import.meta.dir, "../examples/checkout-ui-review.json")
       continue
     }
     if (argument === "--theme") {
@@ -51,16 +64,20 @@ export function parseArgs(args: string[]): CliOptions {
   }
 
   if (!bundlePath) throw new Error(usage)
-  return { bundlePath, themePath }
+  return { bundlePath, themePath, check }
 }
 
 if (import.meta.main) {
   try {
     const options = parseArgs(process.argv.slice(2))
     const bundle = loadBundle(options.bundlePath)
-    const theme = loadTheme(options.themePath)
-    const renderer = await createCliRenderer({ exitOnCtrlC: true, useMouse: true })
-    createRoot(renderer).render(<App bundle={bundle} theme={theme} />)
+    if (options.check) {
+      process.stdout.write(`Review bundle is valid: ${bundle.title}\n`)
+    } else {
+      const theme = loadTheme(options.themePath)
+      const renderer = await createCliRenderer({ exitOnCtrlC: true, useMouse: true })
+      createRoot(renderer).render(<App bundle={bundle} theme={theme} />)
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     process.stderr.write(`review-zen: ${message}\n`)

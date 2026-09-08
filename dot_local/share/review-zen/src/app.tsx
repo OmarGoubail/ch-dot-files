@@ -12,6 +12,8 @@ import type {
   SourceFrame,
   SourceLine,
   TestEvidence,
+  TestKind,
+  VisualKind,
   Zone,
 } from "./types"
 
@@ -62,13 +64,15 @@ function DeltaPane({
   const evidenceByLine = useMemo(() => evidenceForStop(stop), [stop])
   const rendered = useMemo(() => renderSourceWithDelta({
     diff: frame.diff,
+    highlightAs: frame.highlightAs,
     width,
+    height,
     lines: frame.lines,
     focusedLines,
     evidenceByLine,
     theme,
     dim,
-  }), [frame, stop, block, width, theme, dim, focusedLines, evidenceByLine])
+  }), [frame, stop, block, width, height, theme, dim, focusedLines, evidenceByLine])
 
   useEffect(() => {
     terminalRef.current?.write("\u001b[2J\u001b[H\u001b[?25l")
@@ -103,7 +107,7 @@ function FocusPanel({
   theme: ReviewTheme
   activeZone: Zone | null
 }) {
-  const groups = linesForBlock(frame, block)
+  const groups = focusDisplayGroups(frame, block)
   const dimmed = activeZone !== null && activeZone !== "source"
   const foreground = dimmed ? theme.dim : theme.text
   const height = groups.reduce((total, group) => total + group.length, 0) + Math.max(0, groups.length - 1) + 2
@@ -124,12 +128,12 @@ function FocusPanel({
     >
       {groups.flatMap((group, groupIndex) => [
         ...(groupIndex > 0 ? [<text key={`gap:${groupIndex}`} fg={theme.dim}>…</text>] : []),
-        ...group.map((line) => (
+        ...group.map((line, lineIndex) => line ? (
           <text key={line.number} fg={foreground} selectable>
             <span fg={dimmed ? theme.dim : theme.muted}>{String(line.number).padStart(4)}  </span>
             {line.text}
           </text>
-        )),
+        ) : <text key={`omitted:${groupIndex}:${lineIndex}`} fg={theme.dim}>     …</text>),
       ])}
     </box>
   )
@@ -220,6 +224,13 @@ function IntentPanel({ block, theme, activeZone, height, width }: {
       paddingRight={1}
       flexDirection="column"
     >
+      {block.visuals?.map((visual) => (
+        <box key={`${visual.kind}:${visual.title}`} height={visual.lines.length + 2} flexDirection="column">
+          <Label value={visual.title.toUpperCase()} color={visualColor(visual.kind, theme, dimmed)} />
+          {visual.lines.map((line, index) => <text key={`${index}:${line}`} fg={text} selectable>{line || " "}</text>)}
+          <box height={1} />
+        </box>
+      ))}
       <Label value="PSEUDOCODE" color={accent} />
       {block.intent.pseudocode.map((step, index) => (
         <text key={`${index}:${step}`} height={wrappedHeight(step, contentWidth)} fg={text} selectable wrapMode="word">{step}</text>
@@ -266,7 +277,7 @@ function TestPanel({
       border
       borderStyle="rounded"
       borderColor={activeZone === "tests" ? theme.accent : theme.borderMuted}
-      title={` TEST EVIDENCE${tests.length > 1 ? ` ${testIndex + 1}/${tests.length}` : ""} `}
+      title={` TEST EVIDENCE${tests.length > 1 ? ` ${testIndex + 1}/${tests.length}` : ""}${test ? ` · ${testKindLabel(test.kind)}` : ""} `}
       titleColor={activeZone === "tests" ? theme.accent : muted}
       paddingLeft={1}
       paddingRight={1}
@@ -381,7 +392,7 @@ export function App({ bundle, theme }: { bundle: ReviewBundle; theme: ReviewThem
   const testHeight = linkedTests[testIndex]
     ? linkedTests[testIndex].code.length + linkedTests[testIndex].setup.length + linkedTests[testIndex].checks.length + linkedTests[testIndex].limits.length + 13
     : 8
-  const focusHeight = linesForBlock(frame, block).reduce((total, group) => total + group.length, 0)
+  const focusHeight = focusDisplayGroups(frame, block).reduce((total, group) => total + group.length, 0)
     + Math.max(0, block.ranges.length - 1)
     + 2
   const detailsContainerHeight = detailsSideBySide ? detailsHeight : languageHeight + intentHeight + 1
@@ -587,6 +598,13 @@ function linesForBlock(frame: SourceFrame, block: FocusBlock): SourceLine[][] {
   return block.ranges.map((range) => frame.lines.filter((line) => line.number >= range.start && line.number <= range.end))
 }
 
+function focusDisplayGroups(frame: SourceFrame, block: FocusBlock): Array<Array<SourceLine | null>> {
+  return linesForBlock(frame, block).map((group) => {
+    if (group.length <= 5) return group
+    return [...group.slice(0, 2), null, ...group.slice(-2)]
+  })
+}
+
 function languagePanelHeight(block: FocusBlock, width: number): number {
   const contentWidth = Math.max(10, width - 4)
   const contentHeight = block.language.reduce((total, item) => {
@@ -609,7 +627,8 @@ function intentPanelHeight(block: FocusBlock, width: number): number {
     (total, step) => total + wrappedHeight(step, contentWidth),
     0,
   )
-  const contentHeight = 1
+  const visualHeight = (block.visuals || []).reduce((total, visual) => total + visual.lines.length + 2, 0)
+  const contentHeight = visualHeight + 1
     + pseudocodeHeight
     + 1
     + 1 + wrappedHeight(block.intent.effect, contentWidth)
@@ -637,6 +656,17 @@ function wrappedHeight(value: string, width: number): number {
     }
     return total + lines
   }, 0)
+}
+
+function visualColor(kind: VisualKind, theme: ReviewTheme, dimmed: boolean): string {
+  if (dimmed) return theme.dim
+  if (kind === "structure") return theme.blue
+  if (kind === "flow") return theme.accent
+  return theme.magenta
+}
+
+function testKindLabel(kind: TestKind): string {
+  return kind.replace("-", " ").toUpperCase()
 }
 
 function compactName(value: string, width: number): string {

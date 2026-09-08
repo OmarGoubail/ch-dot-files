@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs"
-import type { EvidenceState, ReviewBundle } from "./types"
+import type { EvidenceState, ReviewBundle, TestKind, VisualKind } from "./types"
 
 const evidenceStates = new Set<EvidenceState>(["asserted", "exercised", "unlinked", "unknown"])
+const testKinds = new Set<TestKind>(["unit", "integration", "server-dom", "browser", "visual"])
+const visualKinds = new Set<VisualKind>(["structure", "flow", "state"])
 
 export function loadBundle(path: string): ReviewBundle {
   let parsed: unknown
@@ -36,6 +38,8 @@ export function validateBundle(value: unknown): asserts value is ReviewBundle {
     const id = expectString(test.id, `${path}.id`)
     if (testIds.has(id)) fail(`${path}.id`, `duplicates ${id}`)
     testIds.add(id)
+    const kind = expectString(test.kind, `${path}.kind`)
+    if (!testKinds.has(kind as TestKind)) fail(`${path}.kind`, "must be unit, integration, server-dom, browser, or visual")
     expectString(test.title, `${path}.title`)
     expectString(test.scenario, `${path}.scenario`)
     expectString(test.file, `${path}.file`)
@@ -62,6 +66,9 @@ export function validateBundle(value: unknown): asserts value is ReviewBundle {
     if (frameLines.has(id)) fail(`${path}.id`, `duplicates ${id}`)
     expectString(frame.file, `${path}.file`)
     expectString(frame.symbol, `${path}.symbol`)
+    if (frame.highlightAs !== undefined && frame.highlightAs !== "heex") {
+      fail(`${path}.highlightAs`, "must equal heex when present")
+    }
     expectStringArray(frame.diff, `${path}.diff`)
     if (frame.diff.length === 0) fail(`${path}.diff`, "must not be empty")
     expectArray(frame.lines, `${path}.lines`)
@@ -132,6 +139,17 @@ export function validateBundle(value: unknown): asserts value is ReviewBundle {
         expectString(item.why, `${itemPath}.why`)
         expectStringArray(item.alternatives, `${itemPath}.alternatives`)
       })
+      if (block.visuals !== undefined) {
+        expectArray(block.visuals, `${blockPath}.visuals`)
+        block.visuals.forEach((visual, visualIndex) => {
+          const visualPath = `${blockPath}.visuals[${visualIndex}]`
+          if (!isRecord(visual)) fail(visualPath, "must be an object")
+          const kind = expectString(visual.kind, `${visualPath}.kind`)
+          if (!visualKinds.has(kind as VisualKind)) fail(`${visualPath}.kind`, "must be structure, flow, or state")
+          expectString(visual.title, `${visualPath}.title`)
+          expectStringArray(visual.lines, `${visualPath}.lines`)
+        })
+      }
       if (!isRecord(block.intent)) fail(`${blockPath}.intent`, "must be an object")
       expectStringArray(block.intent.pseudocode, `${blockPath}.intent.pseudocode`)
       expectString(block.intent.effect, `${blockPath}.intent.effect`)

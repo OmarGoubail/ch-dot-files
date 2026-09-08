@@ -1,0 +1,1488 @@
+{
+  "schemaVersion": 1,
+  "title": "Add a LiveView checkout flow",
+  "diff": [
+    "diff --git a/lib/shop_web/live/checkout_live.ex b/lib/shop_web/live/checkout_live.ex",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/lib/shop_web/live/checkout_live.ex",
+    "@@ -0,0 +20,51 @@",
+    "+def render(assigns) do",
+    "+  ~H\"\"\"",
+    "+  <Layouts.app flash={@flash}>",
+    "+    <main id=\"checkout-page\">",
+    "+      <.header>",
+    "+        Checkout",
+    "+        <:subtitle>Confirm your delivery details.</:subtitle>",
+    "+      </.header>",
+    "+",
+    "+      <.form for={@form} id=\"checkout-form\" phx-change=\"validate\" phx-submit=\"save\">",
+    "+        <div class=\"checkout-grid\">",
+    "+          <section aria-labelledby=\"delivery-heading\">",
+    "+            <h2 id=\"delivery-heading\">Delivery</h2>",
+    "+            <.input field={@form[:email]} type=\"email\" label=\"Email\" />",
+    "+            <.input field={@form[:address]} label=\"Address\" />",
+    "+            <.input field={@form[:city]} label=\"City\" />",
+    "+          </section>",
+    "+",
+    "+          <aside aria-labelledby=\"summary-heading\">",
+    "+            <h2 id=\"summary-heading\">Order summary</h2>",
+    "+            <ul id=\"line-items\" phx-update=\"stream\">",
+    "+              <li :for={{dom_id, item} <- @streams.items} id={dom_id}>",
+    "+                <span>{item.name}</span>",
+    "+                <span>{item.quantity} × {Money.to_string(item.price)}</span>",
+    "+              </li>",
+    "+            </ul>",
+    "+            <p id=\"order-total\" aria-live=\"polite\">",
+    "+              Total: {Money.to_string(@total)}",
+    "+            </p>",
+    "+          </aside>",
+    "+        </div>",
+    "+",
+    "+        <.error_summary :if={@form.source.action} errors={@form.errors} />",
+    "+",
+    "+        <div class=\"checkout-actions\">",
+    "+          <.link navigate={~p\"/cart\"}>Return to cart</.link>",
+    "+          <.button disabled={@submitting} phx-disable-with=\"Placing order…\">",
+    "+            <span :if={@submitting}>Placing order…</span>",
+    "+            <span :if={!@submitting}>Place order</span>",
+    "+          </.button>",
+    "+        </div>",
+    "+      </.form>",
+    "+",
+    "+      <section :if={@order} id=\"order-confirmation\" role=\"status\">",
+    "+        <h2>Order placed</h2>",
+    "+        <p>Order {@order.number} is complete.</p>",
+    "+      </section>",
+    "+    </main>",
+    "+  </Layouts.app>",
+    "+  \"\"\"",
+    "+end",
+    "diff --git a/lib/shop_web/live/checkout_live.ex b/lib/shop_web/live/checkout_live.ex",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/lib/shop_web/live/checkout_live.ex",
+    "@@ -0,0 +80,28 @@",
+    "+def handle_event(\"validate\", %{\"order\" => params}, socket) do",
+    "+  form = %Order{} |> Checkout.change_order(params) |> Map.put(:action, :validate) |> to_form()",
+    "+  {:noreply, assign(socket, :form, form)}",
+    "+end",
+    "+",
+    "+def handle_event(\"save\", %{\"order\" => params}, socket) do",
+    "+  changeset = Checkout.change_order(%Order{}, params)",
+    "+",
+    "+  if changeset.valid? do",
+    "+    {:noreply,",
+    "+     socket",
+    "+     |> assign(:submitting, true)",
+    "+     |> start_async(:place_order, fn -> Checkout.place_order(params) end)}",
+    "+  else",
+    "+    {:noreply, assign(socket, :form, to_form(%{changeset | action: :insert}))}",
+    "+  end",
+    "+end",
+    "+",
+    "+def handle_async(:place_order, {:ok, {:ok, order}}, socket) do",
+    "+  {:noreply, socket |> assign(:order, order) |> assign(:submitting, false)}",
+    "+end",
+    "+",
+    "+def handle_async(:place_order, {:exit, _reason}, socket) do",
+    "+  {:noreply,",
+    "+   socket",
+    "+   |> put_flash(:error, \"We could not place your order. Try again.\")",
+    "+   |> assign(:submitting, false)}",
+    "+end",
+    "diff --git a/lib/shop_web/components/checkout_components.ex b/lib/shop_web/components/checkout_components.ex",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/lib/shop_web/components/checkout_components.ex",
+    "@@ -0,0 +10,10 @@",
+    "+attr :errors, :list, required: true",
+    "+",
+    "+def error_summary(assigns) do",
+    "+  ~H\"\"\"",
+    "+  <div id=\"checkout-errors\" role=\"alert\" tabindex=\"-1\" phx-hook=\"FocusError\">",
+    "+    <h2>Check your order</h2>",
+    "+    <p :for={{message, _meta} <- @errors}>{message}</p>",
+    "+  </div>",
+    "+  \"\"\"",
+    "+end",
+    "diff --git a/assets/js/hooks/focus_error.ts b/assets/js/hooks/focus_error.ts",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/assets/js/hooks/focus_error.ts",
+    "@@ -0,0 +1,9 @@",
+    "+export const FocusError = {",
+    "+  mounted() {",
+    "+    this.el.focus()",
+    "+  },",
+    "+",
+    "+  updated() {",
+    "+    this.el.focus()",
+    "+  },",
+    "+}",
+    "diff --git a/assets/css/checkout.css b/assets/css/checkout.css",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/assets/css/checkout.css",
+    "@@ -0,0 +1,16 @@",
+    "+.checkout-grid {",
+    "+  display: grid;",
+    "+  grid-template-columns: minmax(0, 1fr) 22rem;",
+    "+  gap: 2rem;",
+    "+}",
+    "+",
+    "+@media (max-width: 48rem) {",
+    "+  .checkout-grid {",
+    "+    grid-template-columns: 1fr;",
+    "+  }",
+    "+",
+    "+  .checkout-actions {",
+    "+    position: sticky;",
+    "+    bottom: 0;",
+    "+  }",
+    "+}"
+  ],
+  "codeMap": [
+    {
+      "file": "lib/shop_web/live/checkout_live.ex",
+      "symbols": [
+        "CheckoutLive.render/1"
+      ]
+    },
+    {
+      "file": "lib/shop_web/live/checkout_live.ex",
+      "symbols": [
+        "CheckoutLive events"
+      ]
+    },
+    {
+      "file": "lib/shop_web/components/checkout_components.ex",
+      "symbols": [
+        "error_summary/1"
+      ]
+    },
+    {
+      "file": "assets/js/hooks/focus_error.ts",
+      "symbols": [
+        "FocusError hook"
+      ]
+    },
+    {
+      "file": "assets/css/checkout.css",
+      "symbols": [
+        "checkout responsive layout"
+      ]
+    },
+    {
+      "file": "test/shop_web/live/checkout_live_test.exs",
+      "symbols": [
+        "render",
+        "validation",
+        "success",
+        "failure"
+      ]
+    },
+    {
+      "file": "test/browser/checkout_test.exs",
+      "symbols": [
+        "browser focus"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "id": "renders",
+      "kind": "server-dom",
+      "title": "renders streamed items and total",
+      "scenario": "connected render",
+      "file": "test/shop_web/live/checkout_live_test.exs",
+      "startLine": 12,
+      "code": [
+        "{:ok, view, _html} = live(conn, ~p\"/checkout\")",
+        "assert has_element?(view, \"#line-items-123\", \"Keyboard\")",
+        "assert has_element?(view, \"#order-total\", \"$24.00\")"
+      ],
+      "setup": [
+        "Create a cart with two items."
+      ],
+      "action": "Connect the checkout LiveView.",
+      "checks": [
+        "The server DOM has the streamed item and total."
+      ],
+      "limits": [
+        "It does not run JavaScript or prove CSS layout."
+      ]
+    },
+    {
+      "id": "invalid",
+      "kind": "server-dom",
+      "title": "shows validation errors",
+      "scenario": "delivery fields are empty",
+      "file": "test/shop_web/live/checkout_live_test.exs",
+      "startLine": 22,
+      "code": [
+        "view |> form(\"#checkout-form\", order: %{email: \"\"}) |> render_submit()",
+        "assert has_element?(view, \"#checkout-errors[role=alert]\")",
+        "refute_receive {:order_started, _}"
+      ],
+      "setup": [
+        "Connect checkout with empty delivery fields."
+      ],
+      "action": "Submit the form.",
+      "checks": [
+        "The server DOM has an alert.",
+        "No order task starts."
+      ],
+      "limits": [
+        "It does not prove browser focus."
+      ]
+    },
+    {
+      "id": "success",
+      "kind": "server-dom",
+      "title": "shows confirmation after async success",
+      "scenario": "order creation succeeds",
+      "file": "test/shop_web/live/checkout_live_test.exs",
+      "startLine": 31,
+      "code": [
+        "view |> form(\"#checkout-form\", order: valid_params()) |> render_submit()",
+        "render_async(view)",
+        "assert has_element?(view, \"#order-confirmation[role=status]\", \"A-42\")"
+      ],
+      "setup": [
+        "Make order creation return A-42."
+      ],
+      "action": "Submit and wait for async work.",
+      "checks": [
+        "The server DOM has confirmation A-42."
+      ],
+      "limits": [
+        "It does not prove payment settlement."
+      ]
+    },
+    {
+      "id": "failure",
+      "kind": "server-dom",
+      "title": "recovers after task exit",
+      "scenario": "order creation times out",
+      "file": "test/shop_web/live/checkout_live_test.exs",
+      "startLine": 40,
+      "code": [
+        "view |> form(\"#checkout-form\", order: valid_params()) |> render_submit()",
+        "render_async(view)",
+        "assert render(view) =~ \"We could not place your order\"",
+        "assert has_element?(view, \"button:not([disabled])\")"
+      ],
+      "setup": [
+        "Make the order task exit."
+      ],
+      "action": "Submit and wait for async work.",
+      "checks": [
+        "The flash explains the failure.",
+        "The button is available again."
+      ],
+      "limits": [
+        "It does not retry."
+      ]
+    },
+    {
+      "id": "focus",
+      "kind": "browser",
+      "title": "moves focus to the error summary",
+      "scenario": "validation inserts an alert",
+      "file": "test/browser/checkout_test.exs",
+      "startLine": 8,
+      "code": [
+        "session |> visit(\"/checkout\") |> click(button(\"Place order\"))",
+        "assert session |> active_element() |> attribute(\"id\") == \"checkout-errors\""
+      ],
+      "setup": [
+        "Open checkout in a browser."
+      ],
+      "action": "Submit invalid data.",
+      "checks": [
+        "The browser active element is checkout-errors."
+      ],
+      "limits": [
+        "It does not prove screen-reader speech."
+      ]
+    }
+  ],
+  "frames": [
+    {
+      "id": "checkout-render",
+      "file": "lib/shop_web/live/checkout_live.ex",
+      "symbol": "CheckoutLive.render/1",
+      "highlightAs": "heex",
+      "diff": [
+        "diff --git a/lib/shop_web/live/checkout_live.ex b/lib/shop_web/live/checkout_live.ex",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/lib/shop_web/live/checkout_live.ex",
+        "@@ -0,0 +20,51 @@",
+        "+def render(assigns) do",
+        "+  ~H\"\"\"",
+        "+  <Layouts.app flash={@flash}>",
+        "+    <main id=\"checkout-page\">",
+        "+      <.header>",
+        "+        Checkout",
+        "+        <:subtitle>Confirm your delivery details.</:subtitle>",
+        "+      </.header>",
+        "+",
+        "+      <.form for={@form} id=\"checkout-form\" phx-change=\"validate\" phx-submit=\"save\">",
+        "+        <div class=\"checkout-grid\">",
+        "+          <section aria-labelledby=\"delivery-heading\">",
+        "+            <h2 id=\"delivery-heading\">Delivery</h2>",
+        "+            <.input field={@form[:email]} type=\"email\" label=\"Email\" />",
+        "+            <.input field={@form[:address]} label=\"Address\" />",
+        "+            <.input field={@form[:city]} label=\"City\" />",
+        "+          </section>",
+        "+",
+        "+          <aside aria-labelledby=\"summary-heading\">",
+        "+            <h2 id=\"summary-heading\">Order summary</h2>",
+        "+            <ul id=\"line-items\" phx-update=\"stream\">",
+        "+              <li :for={{dom_id, item} <- @streams.items} id={dom_id}>",
+        "+                <span>{item.name}</span>",
+        "+                <span>{item.quantity} × {Money.to_string(item.price)}</span>",
+        "+              </li>",
+        "+            </ul>",
+        "+            <p id=\"order-total\" aria-live=\"polite\">",
+        "+              Total: {Money.to_string(@total)}",
+        "+            </p>",
+        "+          </aside>",
+        "+        </div>",
+        "+",
+        "+        <.error_summary :if={@form.source.action} errors={@form.errors} />",
+        "+",
+        "+        <div class=\"checkout-actions\">",
+        "+          <.link navigate={~p\"/cart\"}>Return to cart</.link>",
+        "+          <.button disabled={@submitting} phx-disable-with=\"Placing order…\">",
+        "+            <span :if={@submitting}>Placing order…</span>",
+        "+            <span :if={!@submitting}>Place order</span>",
+        "+          </.button>",
+        "+        </div>",
+        "+      </.form>",
+        "+",
+        "+      <section :if={@order} id=\"order-confirmation\" role=\"status\">",
+        "+        <h2>Order placed</h2>",
+        "+        <p>Order {@order.number} is complete.</p>",
+        "+      </section>",
+        "+    </main>",
+        "+  </Layouts.app>",
+        "+  \"\"\"",
+        "+end"
+      ],
+      "lines": [
+        {
+          "number": 20,
+          "text": "def render(assigns) do"
+        },
+        {
+          "number": 21,
+          "text": "  ~H\"\"\""
+        },
+        {
+          "number": 22,
+          "text": "  <Layouts.app flash={@flash}>"
+        },
+        {
+          "number": 23,
+          "text": "    <main id=\"checkout-page\">"
+        },
+        {
+          "number": 24,
+          "text": "      <.header>"
+        },
+        {
+          "number": 25,
+          "text": "        Checkout"
+        },
+        {
+          "number": 26,
+          "text": "        <:subtitle>Confirm your delivery details.</:subtitle>"
+        },
+        {
+          "number": 27,
+          "text": "      </.header>"
+        },
+        {
+          "number": 28,
+          "text": ""
+        },
+        {
+          "number": 29,
+          "text": "      <.form for={@form} id=\"checkout-form\" phx-change=\"validate\" phx-submit=\"save\">"
+        },
+        {
+          "number": 30,
+          "text": "        <div class=\"checkout-grid\">"
+        },
+        {
+          "number": 31,
+          "text": "          <section aria-labelledby=\"delivery-heading\">"
+        },
+        {
+          "number": 32,
+          "text": "            <h2 id=\"delivery-heading\">Delivery</h2>"
+        },
+        {
+          "number": 33,
+          "text": "            <.input field={@form[:email]} type=\"email\" label=\"Email\" />"
+        },
+        {
+          "number": 34,
+          "text": "            <.input field={@form[:address]} label=\"Address\" />"
+        },
+        {
+          "number": 35,
+          "text": "            <.input field={@form[:city]} label=\"City\" />"
+        },
+        {
+          "number": 36,
+          "text": "          </section>"
+        },
+        {
+          "number": 37,
+          "text": ""
+        },
+        {
+          "number": 38,
+          "text": "          <aside aria-labelledby=\"summary-heading\">"
+        },
+        {
+          "number": 39,
+          "text": "            <h2 id=\"summary-heading\">Order summary</h2>"
+        },
+        {
+          "number": 40,
+          "text": "            <ul id=\"line-items\" phx-update=\"stream\">"
+        },
+        {
+          "number": 41,
+          "text": "              <li :for={{dom_id, item} <- @streams.items} id={dom_id}>"
+        },
+        {
+          "number": 42,
+          "text": "                <span>{item.name}</span>"
+        },
+        {
+          "number": 43,
+          "text": "                <span>{item.quantity} × {Money.to_string(item.price)}</span>"
+        },
+        {
+          "number": 44,
+          "text": "              </li>"
+        },
+        {
+          "number": 45,
+          "text": "            </ul>"
+        },
+        {
+          "number": 46,
+          "text": "            <p id=\"order-total\" aria-live=\"polite\">"
+        },
+        {
+          "number": 47,
+          "text": "              Total: {Money.to_string(@total)}"
+        },
+        {
+          "number": 48,
+          "text": "            </p>"
+        },
+        {
+          "number": 49,
+          "text": "          </aside>"
+        },
+        {
+          "number": 50,
+          "text": "        </div>"
+        },
+        {
+          "number": 51,
+          "text": ""
+        },
+        {
+          "number": 52,
+          "text": "        <.error_summary :if={@form.source.action} errors={@form.errors} />"
+        },
+        {
+          "number": 53,
+          "text": ""
+        },
+        {
+          "number": 54,
+          "text": "        <div class=\"checkout-actions\">"
+        },
+        {
+          "number": 55,
+          "text": "          <.link navigate={~p\"/cart\"}>Return to cart</.link>"
+        },
+        {
+          "number": 56,
+          "text": "          <.button disabled={@submitting} phx-disable-with=\"Placing order…\">"
+        },
+        {
+          "number": 57,
+          "text": "            <span :if={@submitting}>Placing order…</span>"
+        },
+        {
+          "number": 58,
+          "text": "            <span :if={!@submitting}>Place order</span>"
+        },
+        {
+          "number": 59,
+          "text": "          </.button>"
+        },
+        {
+          "number": 60,
+          "text": "        </div>"
+        },
+        {
+          "number": 61,
+          "text": "      </.form>"
+        },
+        {
+          "number": 62,
+          "text": ""
+        },
+        {
+          "number": 63,
+          "text": "      <section :if={@order} id=\"order-confirmation\" role=\"status\">"
+        },
+        {
+          "number": 64,
+          "text": "        <h2>Order placed</h2>"
+        },
+        {
+          "number": 65,
+          "text": "        <p>Order {@order.number} is complete.</p>"
+        },
+        {
+          "number": 66,
+          "text": "      </section>"
+        },
+        {
+          "number": 67,
+          "text": "    </main>"
+        },
+        {
+          "number": 68,
+          "text": "  </Layouts.app>"
+        },
+        {
+          "number": 69,
+          "text": "  \"\"\""
+        },
+        {
+          "number": 70,
+          "text": "end"
+        }
+      ]
+    },
+    {
+      "id": "checkout-events",
+      "file": "lib/shop_web/live/checkout_live.ex",
+      "symbol": "CheckoutLive events",
+      "diff": [
+        "diff --git a/lib/shop_web/live/checkout_live.ex b/lib/shop_web/live/checkout_live.ex",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/lib/shop_web/live/checkout_live.ex",
+        "@@ -0,0 +80,28 @@",
+        "+def handle_event(\"validate\", %{\"order\" => params}, socket) do",
+        "+  form = %Order{} |> Checkout.change_order(params) |> Map.put(:action, :validate) |> to_form()",
+        "+  {:noreply, assign(socket, :form, form)}",
+        "+end",
+        "+",
+        "+def handle_event(\"save\", %{\"order\" => params}, socket) do",
+        "+  changeset = Checkout.change_order(%Order{}, params)",
+        "+",
+        "+  if changeset.valid? do",
+        "+    {:noreply,",
+        "+     socket",
+        "+     |> assign(:submitting, true)",
+        "+     |> start_async(:place_order, fn -> Checkout.place_order(params) end)}",
+        "+  else",
+        "+    {:noreply, assign(socket, :form, to_form(%{changeset | action: :insert}))}",
+        "+  end",
+        "+end",
+        "+",
+        "+def handle_async(:place_order, {:ok, {:ok, order}}, socket) do",
+        "+  {:noreply, socket |> assign(:order, order) |> assign(:submitting, false)}",
+        "+end",
+        "+",
+        "+def handle_async(:place_order, {:exit, _reason}, socket) do",
+        "+  {:noreply,",
+        "+   socket",
+        "+   |> put_flash(:error, \"We could not place your order. Try again.\")",
+        "+   |> assign(:submitting, false)}",
+        "+end"
+      ],
+      "lines": [
+        {
+          "number": 80,
+          "text": "def handle_event(\"validate\", %{\"order\" => params}, socket) do"
+        },
+        {
+          "number": 81,
+          "text": "  form = %Order{} |> Checkout.change_order(params) |> Map.put(:action, :validate) |> to_form()"
+        },
+        {
+          "number": 82,
+          "text": "  {:noreply, assign(socket, :form, form)}"
+        },
+        {
+          "number": 83,
+          "text": "end"
+        },
+        {
+          "number": 84,
+          "text": ""
+        },
+        {
+          "number": 85,
+          "text": "def handle_event(\"save\", %{\"order\" => params}, socket) do"
+        },
+        {
+          "number": 86,
+          "text": "  changeset = Checkout.change_order(%Order{}, params)"
+        },
+        {
+          "number": 87,
+          "text": ""
+        },
+        {
+          "number": 88,
+          "text": "  if changeset.valid? do"
+        },
+        {
+          "number": 89,
+          "text": "    {:noreply,"
+        },
+        {
+          "number": 90,
+          "text": "     socket"
+        },
+        {
+          "number": 91,
+          "text": "     |> assign(:submitting, true)"
+        },
+        {
+          "number": 92,
+          "text": "     |> start_async(:place_order, fn -> Checkout.place_order(params) end)}"
+        },
+        {
+          "number": 93,
+          "text": "  else"
+        },
+        {
+          "number": 94,
+          "text": "    {:noreply, assign(socket, :form, to_form(%{changeset | action: :insert}))}"
+        },
+        {
+          "number": 95,
+          "text": "  end"
+        },
+        {
+          "number": 96,
+          "text": "end"
+        },
+        {
+          "number": 97,
+          "text": ""
+        },
+        {
+          "number": 98,
+          "text": "def handle_async(:place_order, {:ok, {:ok, order}}, socket) do"
+        },
+        {
+          "number": 99,
+          "text": "  {:noreply, socket |> assign(:order, order) |> assign(:submitting, false)}"
+        },
+        {
+          "number": 100,
+          "text": "end"
+        },
+        {
+          "number": 101,
+          "text": ""
+        },
+        {
+          "number": 102,
+          "text": "def handle_async(:place_order, {:exit, _reason}, socket) do"
+        },
+        {
+          "number": 103,
+          "text": "  {:noreply,"
+        },
+        {
+          "number": 104,
+          "text": "   socket"
+        },
+        {
+          "number": 105,
+          "text": "   |> put_flash(:error, \"We could not place your order. Try again.\")"
+        },
+        {
+          "number": 106,
+          "text": "   |> assign(:submitting, false)}"
+        },
+        {
+          "number": 107,
+          "text": "end"
+        }
+      ]
+    },
+    {
+      "id": "error-summary",
+      "file": "lib/shop_web/components/checkout_components.ex",
+      "symbol": "error_summary/1",
+      "diff": [
+        "diff --git a/lib/shop_web/components/checkout_components.ex b/lib/shop_web/components/checkout_components.ex",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/lib/shop_web/components/checkout_components.ex",
+        "@@ -0,0 +10,10 @@",
+        "+attr :errors, :list, required: true",
+        "+",
+        "+def error_summary(assigns) do",
+        "+  ~H\"\"\"",
+        "+  <div id=\"checkout-errors\" role=\"alert\" tabindex=\"-1\" phx-hook=\"FocusError\">",
+        "+    <h2>Check your order</h2>",
+        "+    <p :for={{message, _meta} <- @errors}>{message}</p>",
+        "+  </div>",
+        "+  \"\"\"",
+        "+end"
+      ],
+      "lines": [
+        {
+          "number": 10,
+          "text": "attr :errors, :list, required: true"
+        },
+        {
+          "number": 11,
+          "text": ""
+        },
+        {
+          "number": 12,
+          "text": "def error_summary(assigns) do"
+        },
+        {
+          "number": 13,
+          "text": "  ~H\"\"\""
+        },
+        {
+          "number": 14,
+          "text": "  <div id=\"checkout-errors\" role=\"alert\" tabindex=\"-1\" phx-hook=\"FocusError\">"
+        },
+        {
+          "number": 15,
+          "text": "    <h2>Check your order</h2>"
+        },
+        {
+          "number": 16,
+          "text": "    <p :for={{message, _meta} <- @errors}>{message}</p>"
+        },
+        {
+          "number": 17,
+          "text": "  </div>"
+        },
+        {
+          "number": 18,
+          "text": "  \"\"\""
+        },
+        {
+          "number": 19,
+          "text": "end"
+        }
+      ]
+    },
+    {
+      "id": "focus-hook",
+      "file": "assets/js/hooks/focus_error.ts",
+      "symbol": "FocusError hook",
+      "diff": [
+        "diff --git a/assets/js/hooks/focus_error.ts b/assets/js/hooks/focus_error.ts",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/assets/js/hooks/focus_error.ts",
+        "@@ -0,0 +1,9 @@",
+        "+export const FocusError = {",
+        "+  mounted() {",
+        "+    this.el.focus()",
+        "+  },",
+        "+",
+        "+  updated() {",
+        "+    this.el.focus()",
+        "+  },",
+        "+}"
+      ],
+      "lines": [
+        {
+          "number": 1,
+          "text": "export const FocusError = {"
+        },
+        {
+          "number": 2,
+          "text": "  mounted() {"
+        },
+        {
+          "number": 3,
+          "text": "    this.el.focus()"
+        },
+        {
+          "number": 4,
+          "text": "  },"
+        },
+        {
+          "number": 5,
+          "text": ""
+        },
+        {
+          "number": 6,
+          "text": "  updated() {"
+        },
+        {
+          "number": 7,
+          "text": "    this.el.focus()"
+        },
+        {
+          "number": 8,
+          "text": "  },"
+        },
+        {
+          "number": 9,
+          "text": "}"
+        }
+      ]
+    },
+    {
+      "id": "checkout-layout",
+      "file": "assets/css/checkout.css",
+      "symbol": "checkout responsive layout",
+      "diff": [
+        "diff --git a/assets/css/checkout.css b/assets/css/checkout.css",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/assets/css/checkout.css",
+        "@@ -0,0 +1,16 @@",
+        "+.checkout-grid {",
+        "+  display: grid;",
+        "+  grid-template-columns: minmax(0, 1fr) 22rem;",
+        "+  gap: 2rem;",
+        "+}",
+        "+",
+        "+@media (max-width: 48rem) {",
+        "+  .checkout-grid {",
+        "+    grid-template-columns: 1fr;",
+        "+  }",
+        "+",
+        "+  .checkout-actions {",
+        "+    position: sticky;",
+        "+    bottom: 0;",
+        "+  }",
+        "+}"
+      ],
+      "lines": [
+        {
+          "number": 1,
+          "text": ".checkout-grid {"
+        },
+        {
+          "number": 2,
+          "text": "  display: grid;"
+        },
+        {
+          "number": 3,
+          "text": "  grid-template-columns: minmax(0, 1fr) 22rem;"
+        },
+        {
+          "number": 4,
+          "text": "  gap: 2rem;"
+        },
+        {
+          "number": 5,
+          "text": "}"
+        },
+        {
+          "number": 6,
+          "text": ""
+        },
+        {
+          "number": 7,
+          "text": "@media (max-width: 48rem) {"
+        },
+        {
+          "number": 8,
+          "text": "  .checkout-grid {"
+        },
+        {
+          "number": 9,
+          "text": "    grid-template-columns: 1fr;"
+        },
+        {
+          "number": 10,
+          "text": "  }"
+        },
+        {
+          "number": 11,
+          "text": ""
+        },
+        {
+          "number": 12,
+          "text": "  .checkout-actions {"
+        },
+        {
+          "number": 13,
+          "text": "    position: sticky;"
+        },
+        {
+          "number": 14,
+          "text": "    bottom: 0;"
+        },
+        {
+          "number": 15,
+          "text": "  }"
+        },
+        {
+          "number": 16,
+          "text": "}"
+        }
+      ]
+    }
+  ],
+  "stops": [
+    {
+      "id": "shape",
+      "title": "Render the checkout structure",
+      "scenario": "the shopper opens checkout",
+      "sourceFrameId": "checkout-render",
+      "focusBlocks": [
+        {
+          "id": "shell",
+          "title": "Connect the large HEEx tree",
+          "ranges": [
+            {
+              "start": 20,
+              "end": 29
+            },
+            {
+              "start": 62,
+              "end": 70
+            }
+          ],
+          "language": [
+            {
+              "token": "~H\"\"\"",
+              "origin": "HEEx sigil",
+              "meaning": "This block compiles HTML with LiveView expressions.",
+              "why": "LiveView can track values and send DOM patches.",
+              "alternatives": [
+                "a separate HEEx template"
+              ]
+            },
+            {
+              "token": "phx-submit=\"save\"",
+              "origin": "LiveView event binding",
+              "meaning": "Form submission sends a save event to the LiveView process.",
+              "why": "The server owns checkout submission.",
+              "alternatives": [
+                "a standard HTTP form"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "structure",
+              "title": "Rendered shape",
+              "lines": [
+                "CheckoutLive",
+                "└─ Layouts.app",
+                "   └─ main#checkout-page",
+                "      ├─ header",
+                "      ├─ form#checkout-form",
+                "      └─ confirmation (conditional)"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "render one checkout page",
+              "bind change and save events",
+              "show confirmation only after success"
+            ],
+            "effect": "One LiveView owns the checkout screen.",
+            "reason": "The screen must update without full navigation.",
+            "removed": "The form and confirmation have no stable owner."
+          },
+          "evidence": {
+            "state": "exercised",
+            "testIds": [
+              "renders",
+              "success"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "stream",
+      "title": "Patch streamed cart items",
+      "scenario": "the cart contains items",
+      "sourceFrameId": "checkout-render",
+      "focusBlocks": [
+        {
+          "id": "items",
+          "title": "Give streamed items stable DOM IDs",
+          "ranges": [
+            {
+              "start": 38,
+              "end": 49
+            }
+          ],
+          "language": [
+            {
+              "token": "phx-update=\"stream\"",
+              "origin": "LiveView stream container",
+              "meaning": "LiveView changes children by DOM ID.",
+              "why": "A cart patch does not replace the complete list.",
+              "alternatives": [
+                "a normal list assign"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "structure",
+              "title": "Order summary",
+              "lines": [
+                "aside",
+                "├─ ul#line-items [stream]",
+                "│  └─ li#line-items-123",
+                "└─ p#order-total [live]"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "render each stream item by DOM ID",
+              "announce the current total"
+            ],
+            "effect": "Cart patches preserve list identity.",
+            "reason": "Stable identity reduces DOM replacement.",
+            "removed": "Stream patches cannot identify children."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "renders"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "validate",
+      "title": "Show validation errors",
+      "scenario": "delivery fields are empty",
+      "sourceFrameId": "checkout-events",
+      "focusBlocks": [
+        {
+          "id": "validate-event",
+          "title": "Assign a displayable error form",
+          "ranges": [
+            {
+              "start": 80,
+              "end": 83
+            }
+          ],
+          "language": [
+            {
+              "token": "Map.put(:action, :validate)",
+              "origin": "changeset action",
+              "meaning": "The action lets form components display errors.",
+              "why": "Errors can exist before the UI shows them.",
+              "alternatives": [
+                "set the action in the context"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "flow",
+              "title": "Validation flow",
+              "lines": [
+                "input → phx-change",
+                "      → handle_event",
+                "      → assign @form",
+                "      → DOM patch with errors"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "validate params",
+              "mark errors for display",
+              "assign the form"
+            ],
+            "effect": "The next patch shows current errors.",
+            "reason": "Feedback must follow user input.",
+            "removed": "The form keeps stale or hidden errors."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "invalid"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "submit",
+      "title": "Start order work without blocking",
+      "scenario": "the form is valid",
+      "sourceFrameId": "checkout-events",
+      "focusBlocks": [
+        {
+          "id": "async",
+          "title": "Enter submitting state and start async work",
+          "ranges": [
+            {
+              "start": 85,
+              "end": 97
+            }
+          ],
+          "language": [
+            {
+              "token": "start_async(:place_order, fn -> ... end)",
+              "origin": "LiveView async task",
+              "meaning": "LiveView receives the task result later in handle_async/3.",
+              "why": "It can render submitting state before work finishes.",
+              "alternatives": [
+                "run the context call synchronously"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "flow",
+              "title": "Save event",
+              "lines": [
+                "save → validate",
+                "     → @submitting = true",
+                "     → start task",
+                "     → immediate DOM patch"
+              ]
+            },
+            {
+              "kind": "state",
+              "title": "State",
+              "lines": [
+                "IDLE → SUBMITTING",
+                "button enabled → disabled"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "validate",
+              "set submitting state",
+              "start order creation"
+            ],
+            "effect": "The button disables while work runs.",
+            "reason": "Context work must not block the LiveView process.",
+            "removed": "Progress cannot render until work finishes."
+          },
+          "evidence": {
+            "state": "exercised",
+            "testIds": [
+              "success",
+              "failure"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "outcomes",
+      "title": "Handle success and failure",
+      "scenario": "the async task finishes",
+      "sourceFrameId": "checkout-events",
+      "focusBlocks": [
+        {
+          "id": "success",
+          "title": "Render successful completion",
+          "ranges": [
+            {
+              "start": 98,
+              "end": 100
+            }
+          ],
+          "language": [
+            {
+              "token": "{:ok, {:ok, order}}",
+              "origin": "nested task and domain results",
+              "meaning": "The task and the order operation both succeeded.",
+              "why": "These are separate outcomes.",
+              "alternatives": [
+                "raise on domain failure"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "state",
+              "title": "Success",
+              "lines": [
+                "SUBMITTING → COMPLETE",
+                "@order: nil → A-42",
+                "confirmation: hidden → visible"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "store the order",
+              "clear submitting state"
+            ],
+            "effect": "The DOM shows the order number.",
+            "reason": "The shopper needs a completion result.",
+            "removed": "The page remains in submitting state."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "success"
+            ]
+          }
+        },
+        {
+          "id": "failure",
+          "title": "Recover after task exit",
+          "ranges": [
+            {
+              "start": 102,
+              "end": 107
+            }
+          ],
+          "language": [
+            {
+              "token": "{:exit, _reason}",
+              "origin": "LiveView async exit result",
+              "meaning": "The task stopped without a normal value.",
+              "why": "Timeouts need a recoverable UI result.",
+              "alternatives": [
+                "let the LiveView crash"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "state",
+              "title": "Failure",
+              "lines": [
+                "SUBMITTING → FAILED",
+                "flash: empty → safe error",
+                "button: disabled → enabled"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "show a safe error",
+              "clear submitting state"
+            ],
+            "effect": "The shopper can try again.",
+            "reason": "A task exit must not lock checkout.",
+            "removed": "The button stays disabled."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "failure"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "focus-error",
+      "title": "Move browser focus to errors",
+      "scenario": "validation inserts or updates the alert",
+      "sourceFrameId": "error-summary",
+      "focusBlocks": [
+        {
+          "id": "boundary",
+          "title": "Connect server DOM to a browser hook",
+          "ranges": [
+            {
+              "start": 14,
+              "end": 18
+            }
+          ],
+          "language": [
+            {
+              "token": "phx-hook=\"FocusError\"",
+              "origin": "JavaScript hook boundary",
+              "meaning": "LiveView gives this element to browser code.",
+              "why": "Server HTML cannot move browser focus by itself.",
+              "alternatives": [
+                "focus the first invalid field"
+              ]
+            },
+            {
+              "token": "tabindex=\"-1\"",
+              "origin": "programmatic focus target",
+              "meaning": "Code can focus this alert, but normal Tab navigation skips it.",
+              "why": "Focus moves here only for errors.",
+              "alternatives": [
+                "tabindex=\"0\""
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "flow",
+              "title": "Server and browser",
+              "lines": [
+                "DOM patch inserts alert",
+                "  → FocusError mounts",
+                "  → element.focus()",
+                "  → active element changes"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "render the alert",
+              "attach the focus hook"
+            ],
+            "effect": "The browser has an error focus target.",
+            "reason": "Inserted errors must be perceivable.",
+            "removed": "Keyboard users can miss the error."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "invalid",
+              "focus"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "hook",
+      "title": "Focus after browser patches",
+      "scenario": "the alert mounts or updates",
+      "sourceFrameId": "focus-hook",
+      "focusBlocks": [
+        {
+          "id": "lifecycle",
+          "title": "Focus on both lifecycle paths",
+          "ranges": [
+            {
+              "start": 2,
+              "end": 8
+            }
+          ],
+          "language": [
+            {
+              "token": "mounted() / updated()",
+              "origin": "LiveView hook callbacks",
+              "meaning": "One runs on insertion and one runs after later patches.",
+              "why": "New errors can insert or update the alert.",
+              "alternatives": [
+                "handle only mounted"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "flow",
+              "title": "Browser lifecycle",
+              "lines": [
+                "insert → mounted → focus",
+                "patch  → updated → focus"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "focus when mounted",
+              "focus after updates"
+            ],
+            "effect": "Focus follows each new error result.",
+            "reason": "The server cannot directly control browser focus.",
+            "removed": "Only the first result receives focus."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": [
+              "focus"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "title": "Stack checkout on small screens",
+      "scenario": "the viewport is 48rem wide or less",
+      "sourceFrameId": "checkout-layout",
+      "focusBlocks": [
+        {
+          "id": "layout",
+          "title": "Change two columns into one",
+          "ranges": [
+            {
+              "start": 1,
+              "end": 5
+            },
+            {
+              "start": 7,
+              "end": 16
+            }
+          ],
+          "language": [
+            {
+              "token": "@media (max-width: 48rem)",
+              "origin": "CSS media query",
+              "meaning": "These rules apply only to small viewports.",
+              "why": "The summary must fit below the form.",
+              "alternatives": [
+                "a container query"
+              ]
+            }
+          ],
+          "visuals": [
+            {
+              "kind": "structure",
+              "title": "Wide and narrow",
+              "lines": [
+                "WIDE:   delivery | summary",
+                "NARROW: delivery",
+                "        summary",
+                "        [sticky actions]"
+              ]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "use two columns on wide screens",
+              "stack content on small screens"
+            ],
+            "effect": "Checkout avoids narrow columns.",
+            "reason": "Small screens need another layout.",
+            "removed": "The form can overflow or compress."
+          },
+          "evidence": {
+            "state": "unlinked",
+            "testIds": []
+          }
+        }
+      ]
+    }
+  ]
+}

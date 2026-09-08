@@ -1,4 +1,6 @@
 export type EvidenceState = "asserted" | "exercised" | "unlinked" | "unknown"
+export type TestKind = "unit" | "integration" | "server-dom" | "browser" | "visual"
+export type VisualKind = "structure" | "flow" | "state"
 
 export type SourceLine = {
   number: number
@@ -18,6 +20,12 @@ export type LanguageItem = {
   alternatives: string[]
 }
 
+export type ExplanationVisual = {
+  kind: VisualKind
+  title: string
+  lines: string[]
+}
+
 export type Intent = {
   pseudocode: string[]
   effect: string
@@ -35,6 +43,7 @@ export type FocusBlock = {
   title: string
   ranges: SourceRange[]
   language: LanguageItem[]
+  visuals?: ExplanationVisual[]
   intent: Intent
   evidence: FocusEvidence
 }
@@ -43,6 +52,7 @@ export type SourceFrame = {
   id: string
   file: string
   symbol: string
+  highlightAs?: "heex"
   diff: string[]
   lines: SourceLine[]
 }
@@ -57,6 +67,7 @@ export type ReviewStop = {
 
 export type TestEvidence = {
   id: string
+  kind: TestKind
   title: string
   scenario: string
   file: string

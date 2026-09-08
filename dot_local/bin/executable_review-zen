@@ -2,4 +2,25 @@
 set -euo pipefail
 
 tool_dir="$HOME/.local/share/review-zen"
-exec bun run "$tool_dir/src/index.tsx" "$@"
+args=("$@")
+stdin_bundle=""
+
+for index in "${!args[@]}"; do
+  if [[ "${args[$index]}" == "-" ]]; then
+    stdin_bundle=$(mktemp "${TMPDIR:-/tmp}/review-zen-stdin.XXXXXX.json")
+    cat >"$stdin_bundle"
+    args[$index]="$stdin_bundle"
+    break
+  fi
+done
+
+if [[ -z "$stdin_bundle" ]]; then
+  exec bun run "$tool_dir/src/index.tsx" "${args[@]}"
+fi
+
+trap 'rm -f "$stdin_bundle"' EXIT
+if [[ " ${args[*]} " == *" --check "* ]]; then
+  bun run "$tool_dir/src/index.tsx" "${args[@]}"
+else
+  bun run "$tool_dir/src/index.tsx" "${args[@]}" </dev/tty
+fi

@@ -19,7 +19,9 @@ const evidenceRank: Record<EvidenceState, number> = {
 
 export function renderSourceWithDelta(options: {
   diff: string[]
+  highlightAs?: "heex"
   width: number
+  height: number
   lines: SourceLine[]
   focusedLines: Set<number>
   evidenceByLine: Map<number, EvidenceState>
@@ -34,7 +36,7 @@ export function renderSourceWithDelta(options: {
     "--width",
     String(Math.max(50, options.width - 3)),
   ], {
-    input: `${options.diff.join("\n")}\n`,
+    input: `${diffForSyntax(options.diff, options.highlightAs).join("\n")}\n`,
     env: { ...process.env, TERM: "xterm-256color", COLORTERM: "truecolor" },
     maxBuffer: 2 * 1024 * 1024,
   })
@@ -49,6 +51,15 @@ export function renderSourceWithDelta(options: {
   return annotateDelta(result.stdout.toString("utf8"), options)
 }
 
+export function diffForSyntax(diff: string[], highlightAs: "heex" | undefined): string[] {
+  if (highlightAs !== "heex") return diff
+  return diff.map((line) => {
+    if (line.startsWith("diff --git ")) return line.replaceAll(".ex ", ".html.eex ").replace(/\.ex$/, ".html.eex")
+    if (line.startsWith("--- ") || line.startsWith("+++ ")) return line.replace(/\.ex$/, ".html.eex")
+    return line
+  })
+}
+
 export function strongestEvidence(states: EvidenceState[]): EvidenceState {
   return states.reduce((best, state) => evidenceRank[state] > evidenceRank[best] ? state : best, "unknown")
 }
@@ -61,11 +72,13 @@ function annotateDelta(
     evidenceByLine: Map<number, EvidenceState>
     theme: ReviewTheme
     dim: boolean
-  },
+    height: number
+  }
 ): string {
   let sourceIndex = 0
+  const focusedRows: number[] = []
   const rows = rendered.replace(/\r\n/g, "\n").split("\n")
-  const output = rows.map((row) => {
+  const output = rows.map((row, rowIndex) => {
     while (options.lines[sourceIndex]?.text === "") sourceIndex += 1
     const sourceLine = options.lines[sourceIndex]
     const matchesSource = sourceLine !== undefined && stripAnsi(row).trimEnd() === sourceLine.text
@@ -77,6 +90,7 @@ function annotateDelta(
       const focusMark = focus ? color("›", options.theme.accent) : " "
       const evidenceMark = evidence ? color(evidenceGlyph[evidence], evidenceColor(evidence, options.theme)) : " "
       prefix = `${focusMark}${evidenceMark} `
+      if (focus) focusedRows.push(rowIndex)
       sourceIndex += 1
     }
 
@@ -84,7 +98,20 @@ function annotateDelta(
     return `${prefix}${content}`
   })
 
-  return output.join("\r\n")
+  return sourceWindow(output, focusedRows, options.height).join("\r\n")
+}
+
+function sourceWindow(rows: string[], focusedRows: number[], height: number): string[] {
+  if (height < 1 || rows.length <= height) return rows
+
+  const firstFocus = focusedRows[0] ?? 0
+  const lastFocus = focusedRows.at(-1) ?? firstFocus
+  const visibleLastFocus = lastFocus - firstFocus < height ? lastFocus : firstFocus
+  const focusHeight = visibleLastFocus - firstFocus + 1
+  const contextBefore = Math.floor((height - focusHeight) / 2)
+  const start = Math.max(0, Math.min(firstFocus - contextBefore, rows.length - height))
+
+  return rows.slice(start, start + height)
 }
 
 function evidenceColor(state: EvidenceState, theme: ReviewTheme): string {

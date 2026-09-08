@@ -27,6 +27,7 @@ A Source Frame has a unique `id`, a repository-relative `file`, a `symbol`, a fo
   "id": "transfers-execute",
   "file": "lib/shop/transfers.ex",
   "symbol": "Transfers.execute/1",
+  "highlightAs": "heex",
   "diff": ["diff --git ...", "@@ ...", "+defp execute(command) do"],
   "lines": [
     {"number": 22, "text": "  defp execute(command) do"}
@@ -35,6 +36,8 @@ A Source Frame has a unique `id`, a repository-relative `file`, a `symbol`, a fo
 ```
 
 Use enough context to show the complete changed function. Put source lines in ascending order. Each line number must be unique in its frame.
+
+Use `"highlightAs": "heex"` for a Source Frame that primarily contains a HEEx template. Review Zen uses an HTML-EEx syntax grammar for that frame.
 
 ## Review Stop and Focus Block
 
@@ -63,6 +66,13 @@ A Focus Block can use more than one range. Use this for code that must be read a
         "reason": "A rejected transfer must leave the database unchanged.",
         "removed": "An error can leave partial data."
       },
+      "visuals": [
+        {
+          "kind": "flow",
+          "title": "Event flow",
+          "lines": ["submit → handle_event → assign → DOM patch"]
+        }
+      ],
       "evidence": {
         "state": "asserted",
         "testIds": ["insufficient-funds"]
@@ -81,6 +91,7 @@ Test Evidence contains the test source and a plain behavior analysis.
 ```json
 {
   "id": "insufficient-funds",
+  "kind": "integration",
   "title": "does not move money without funds",
   "scenario": "failure path",
   "file": "test/shop_web/controllers/transfer_controller_test.exs",
@@ -92,6 +103,10 @@ Test Evidence contains the test source and a plain behavior analysis.
   "limits": ["It does not test concurrent transfers."]
 }
 ```
+
+Use `unit`, `integration`, `server-dom`, `browser`, or `visual` for `kind`. A server DOM test does not prove browser JavaScript, focus, CSS, or responsive layout.
+
+A Focus Block can include `visuals`. Each visual has a `kind` of `structure`, `flow`, or `state`, a short title, and an array of display lines.
 
 Use these evidence states:
 

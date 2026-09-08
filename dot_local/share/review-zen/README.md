@@ -13,7 +13,10 @@ After chezmoi applies the tool, run:
 
 ```sh
 review-zen --demo
+review-zen --demo-ui
 review-zen path/to/review.json
+cat path/to/review.json | review-zen -
+review-zen --check path/to/review.json
 ```
 
 Review Zen reads `~/.pi/agent/themes/theme-current.json`. Use `--theme path/to/theme.json` to select another compatible Pi theme.

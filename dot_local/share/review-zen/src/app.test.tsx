@@ -4,9 +4,11 @@ import { resolve } from "node:path"
 import { act } from "react"
 import { App } from "./app"
 import { loadBundle, validateBundle } from "./bundle"
+import { diffForSyntax } from "./delta"
 import { testTheme } from "./theme"
 
 const bundle = loadBundle(resolve(import.meta.dir, "../examples/transfer-review.json"))
+const uiBundle = loadBundle(resolve(import.meta.dir, "../examples/checkout-ui-review.json"))
 
 async function pressKey(setup: { mockInput: { pressKey(key: string): void } }, key: string) {
   await act(async () => {
@@ -170,6 +172,62 @@ describe("Review Zen", () => {
     expect(frame).toContain("SOURCE")
     expect(frame).toContain("create/2")
     expect(frame).toContain("transfers.ex")
+  })
+  test("navigates a large UI review and exposes missing visual evidence", async () => {
+    const setup = await testRender(<App bundle={uiBundle} theme={testTheme} />, { width: 130, height: 48 })
+    renderers.push(setup.renderer)
+
+    for (let index = 1; index < uiBundle.stops.length; index += 1) await pressKey(setup, "n")
+    await setup.waitForFrame((value) => value.includes("viewport is 48rem wide or less"))
+    await pressKey(setup, "t")
+    const frame = await setup.waitForFrame((value) => value.includes("No linked test evidence."))
+
+    expect(frame).toContain("checkout responsive layout")
+    expect(frame).toContain("This does not prove that the code is untested.")
+  })
+
+  test("shows LiveView structure and keeps active HEEx visible", async () => {
+    const setup = await testRender(<App bundle={uiBundle} theme={testTheme} />, { width: 130, height: 48 })
+    renderers.push(setup.renderer)
+
+    const initial = await setup.waitForFrame((value) => value.includes("RENDERED SHAPE"))
+    expect(initial).toContain("main#checkout-page")
+
+    await pressKey(setup, "n")
+    const frame = await setup.waitForFrame((value) => value.includes("Give streamed items stable DOM IDs"))
+    const source = frame.slice(0, frame.indexOf("FOCUS"))
+
+    expect(source).toContain("phx-update=\"stream\"")
+    expect(frame).toContain("ORDER SUMMARY")
+  })
+
+  test("distinguishes LiveView DOM evidence from browser evidence", async () => {
+    const setup = await testRender(<App bundle={uiBundle} theme={testTheme} />, { width: 130, height: 48 })
+    renderers.push(setup.renderer)
+
+    for (let index = 0; index < 5; index += 1) await pressKey(setup, "n")
+    await setup.waitForFrame((value) => value.includes("Connect server DOM to a browser hook"))
+    await pressKey(setup, "t")
+    await setup.waitForFrame((value) => value.includes("SERVER DOM"))
+    await pressKey(setup, "]")
+    const frame = await setup.waitForFrame((value) => value.includes("BROWSER") && value.includes("moves focus to the error summary"))
+
+    expect(frame).toContain("test/browser/checkout_test.exs:8")
+  })
+
+})
+
+describe("source syntax", () => {
+  test("presents inline HEEx through Delta's HTML EEx syntax", () => {
+    const diff = [
+      "diff --git a/lib/shop_web/live/page_live.ex b/lib/shop_web/live/page_live.ex",
+      "+++ b/lib/shop_web/live/page_live.ex",
+    ]
+
+    expect(diffForSyntax(diff, "heex")).toEqual([
+      "diff --git a/lib/shop_web/live/page_live.html.eex b/lib/shop_web/live/page_live.html.eex",
+      "+++ b/lib/shop_web/live/page_live.html.eex",
+    ])
   })
 })
 

@@ -120,6 +120,7 @@
   "tests": [
     {
       "id": "happy-transfer",
+      "kind": "integration",
       "title": "moves money and records entries",
       "scenario": "happy path",
       "file": "test/shop_web/controllers/transfer_controller_test.exs",
@@ -156,6 +157,7 @@
     },
     {
       "id": "insufficient-funds",
+      "kind": "integration",
       "title": "does not move money without funds",
       "scenario": "failure path",
       "file": "test/shop_web/controllers/transfer_controller_test.exs",
