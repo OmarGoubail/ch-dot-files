@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+# dependency-lock: {{ include "private_dot_pi/private_agent/tools/review-zen/bun.lock" | sha256sum }}
+tool_dir="$HOME/.pi/agent/tools/review-zen"
+
+if [ ! -d "$tool_dir" ]; then
+  exit 0
+fi
+
+if ! command -v bun >/dev/null 2>&1; then
+  printf '%s\n' 'review-zen: Bun is required to install dependencies.' >&2
+  exit 1
+fi
+
+cd "$tool_dir"
+bun install --production --frozen-lockfile

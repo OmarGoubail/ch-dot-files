@@ -1,0 +1,591 @@
+{
+  "schemaVersion": 1,
+  "title": "Add safe account transfers",
+  "diff": [
+    "diff --git a/lib/shop_web/controllers/transfer_controller.ex b/lib/shop_web/controllers/transfer_controller.ex",
+    "new file mode 100644",
+    "index 0000000..a811d91",
+    "--- /dev/null",
+    "+++ b/lib/shop_web/controllers/transfer_controller.ex",
+    "@@ -0,0 +1,22 @@",
+    "+defmodule ShopWeb.TransferController do",
+    "+  use ShopWeb, :controller",
+    "+",
+    "+  alias Shop.Transfers",
+    "+",
+    "+  def create(conn, %{\"transfer\" => params}) do",
+    "+    case Transfers.transfer(params) do",
+    "+      {:ok, transfer} ->",
+    "+        conn",
+    "+        |> put_status(:created)",
+    "+        |> render(:show, transfer: transfer)",
+    "+",
+    "+      {:error, :insufficient_funds} ->",
+    "+        conn",
+    "+        |> put_status(:unprocessable_entity)",
+    "+        |> json(%{error: \"insufficient_funds\"})",
+    "+    end",
+    "+  end",
+    "+end",
+    "diff --git a/lib/shop/transfers.ex b/lib/shop/transfers.ex",
+    "new file mode 100644",
+    "index 0000000..352d4ef",
+    "--- /dev/null",
+    "+++ b/lib/shop/transfers.ex",
+    "@@ -0,0 +1,35 @@",
+    "+defmodule Shop.Transfers do",
+    "+  alias Shop.Accounts",
+    "+  alias Shop.Ledger",
+    "+  alias Shop.Money",
+    "+  alias Shop.Repo",
+    "+  alias Shop.Transfers.Transfer",
+    "+  alias Shop.Transfers.TransferCommand",
+    "+",
+    "+  def transfer(attrs) do",
+    "+    with {:ok, command} <- TransferCommand.cast(attrs) do",
+    "+      find_or_execute(command)",
+    "+    end",
+    "+  end",
+    "+",
+    "+  defp find_or_execute(command) do",
+    "+    case Repo.get_by(Transfer, idempotency_key: command.idempotency_key) do",
+    "+      nil -> execute(command)",
+    "+      transfer -> {:ok, transfer}",
+    "+    end",
+    "+  end",
+    "+",
+    "+  defp execute(command) do",
+    "+    Repo.transaction(fn ->",
+    "+      with {:ok, from, to} <-",
+    "+             Accounts.lock_pair(command.from_id, command.to_id),",
+    "+           :ok <- Money.ensure_available(from.balance, command.amount),",
+    "+           {:ok, _accounts} <- Accounts.move(from, to, command.amount),",
+    "+           {:ok, transfer} <- Ledger.record(command) do",
+    "+        transfer",
+    "+      else",
+    "+        {:error, reason} -> Repo.rollback(reason)",
+    "+      end",
+    "+    end)",
+    "+  end",
+    "+end",
+    "diff --git a/test/shop_web/controllers/transfer_controller_test.exs b/test/shop_web/controllers/transfer_controller_test.exs",
+    "new file mode 100644",
+    "index 0000000..fe32092",
+    "--- /dev/null",
+    "+++ b/test/shop_web/controllers/transfer_controller_test.exs",
+    "@@ -0,0 +1,32 @@",
+    "+defmodule ShopWeb.TransferControllerTest do",
+    "+  use ShopWeb.ConnCase",
+    "+",
+    "+  test \"moves money and records entries\", %{conn: conn} do",
+    "+    sender = account_fixture(balance: Money.new(100, :USD))",
+    "+    receiver = account_fixture(balance: Money.new(20, :USD))",
+    "+    params = transfer_params(sender, receiver, 30, \"req-101\")",
+    "+",
+    "+    conn = post(conn, ~p\"/api/transfers\", transfer: params)",
+    "+",
+    "+    assert %{\"id\" => transfer_id} = json_response(conn, 201)",
+    "+    assert Accounts.balance(sender) == Money.new(70, :USD)",
+    "+    assert Accounts.balance(receiver) == Money.new(50, :USD)",
+    "+    assert Ledger.kinds(transfer_id) == [:debit, :credit]",
+    "+  end",
+    "+",
+    "+  test \"does not move money without funds\", %{conn: conn} do",
+    "+    sender = account_fixture(balance: Money.new(10, :USD))",
+    "+    receiver = account_fixture(balance: Money.new(20, :USD))",
+    "+    params = transfer_params(sender, receiver, 25, \"req-102\")",
+    "+",
+    "+    conn = post(conn, ~p\"/api/transfers\", transfer: params)",
+    "+",
+    "+    assert %{\"error\" => \"insufficient_funds\"} = json_response(conn, 422)",
+    "+    assert {Money.new(10, :USD), Money.new(20, :USD)} == balances(sender, receiver)",
+    "+    refute Ledger.exists_for_key?(\"req-102\")",
+    "+  end",
+    "+end"
+  ],
+  "codeMap": [
+    {
+      "file": "lib/shop_web/controllers/transfer_controller.ex",
+      "symbols": ["create/2"]
+    },
+    {
+      "file": "lib/shop/transfers.ex",
+      "symbols": ["transfer/1", "find_or_execute/1", "execute/1"]
+    },
+    {
+      "file": "test/shop_web/controllers/transfer_controller_test.exs",
+      "symbols": ["happy-path test", "failure-path test"]
+    }
+  ],
+  "tests": [
+    {
+      "id": "happy-transfer",
+      "title": "moves money and records entries",
+      "scenario": "happy path",
+      "file": "test/shop_web/controllers/transfer_controller_test.exs",
+      "startLine": 4,
+      "code": [
+        "test \"moves money and records entries\", %{conn: conn} do",
+        "  sender = account_fixture(balance: Money.new(100, :USD))",
+        "  receiver = account_fixture(balance: Money.new(20, :USD))",
+        "  params = transfer_params(sender, receiver, 30, \"req-101\")",
+        "",
+        "  conn = post(conn, ~p\"/api/transfers\", transfer: params)",
+        "",
+        "  assert %{\"id\" => transfer_id} = json_response(conn, 201)",
+        "  assert Accounts.balance(sender) == Money.new(70, :USD)",
+        "  assert Accounts.balance(receiver) == Money.new(50, :USD)",
+        "  assert Ledger.kinds(transfer_id) == [:debit, :credit]",
+        "end"
+      ],
+      "setup": [
+        "Create a sender with $100.00.",
+        "Create a receiver with $20.00.",
+        "Request a transfer of $30.00."
+      ],
+      "action": "Send one POST request to the transfer endpoint.",
+      "checks": [
+        "The response has status 201 and a transfer ID.",
+        "The sender has $70.00 and the receiver has $50.00.",
+        "The ledger has one debit and one credit."
+      ],
+      "limits": [
+        "It does not run two transfers at the same time.",
+        "It does not prove the insufficient-funds path."
+      ]
+    },
+    {
+      "id": "insufficient-funds",
+      "title": "does not move money without funds",
+      "scenario": "failure path",
+      "file": "test/shop_web/controllers/transfer_controller_test.exs",
+      "startLine": 17,
+      "code": [
+        "test \"does not move money without funds\", %{conn: conn} do",
+        "  sender = account_fixture(balance: Money.new(10, :USD))",
+        "  receiver = account_fixture(balance: Money.new(20, :USD))",
+        "  params = transfer_params(sender, receiver, 25, \"req-102\")",
+        "",
+        "  conn = post(conn, ~p\"/api/transfers\", transfer: params)",
+        "",
+        "  assert %{\"error\" => \"insufficient_funds\"} = json_response(conn, 422)",
+        "  assert {Money.new(10, :USD), Money.new(20, :USD)} == balances(sender, receiver)",
+        "  refute Ledger.exists_for_key?(\"req-102\")",
+        "end"
+      ],
+      "setup": [
+        "Create a sender with $10.00.",
+        "Create a receiver with $20.00.",
+        "Request a transfer of $25.00."
+      ],
+      "action": "Send one POST request to the transfer endpoint.",
+      "checks": [
+        "The response has status 422 and the insufficient_funds error.",
+        "Both balances stay unchanged.",
+        "The ledger has no record for this request."
+      ],
+      "limits": [
+        "It does not prove that row locks prevent a concurrent overspend.",
+        "It does not test other transaction failures."
+      ]
+    }
+  ],
+  "frames": [
+    {
+      "id": "controller-create",
+      "file": "lib/shop_web/controllers/transfer_controller.ex",
+      "symbol": "TransferController.create/2",
+      "diff": [
+        "diff --git a/lib/shop_web/controllers/transfer_controller.ex b/lib/shop_web/controllers/transfer_controller.ex",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/lib/shop_web/controllers/transfer_controller.ex",
+        "@@ -0,0 +6,13 @@",
+        "+  def create(conn, %{\"transfer\" => params}) do",
+        "+    case Transfers.transfer(params) do",
+        "+      {:ok, transfer} ->",
+        "+        conn",
+        "+        |> put_status(:created)",
+        "+        |> render(:show, transfer: transfer)",
+        "+",
+        "+      {:error, :insufficient_funds} ->",
+        "+        conn",
+        "+        |> put_status(:unprocessable_entity)",
+        "+        |> json(%{error: \"insufficient_funds\"})",
+        "+    end",
+        "+  end"
+      ],
+      "lines": [
+        {"number": 6, "text": "  def create(conn, %{\"transfer\" => params}) do"},
+        {"number": 7, "text": "    case Transfers.transfer(params) do"},
+        {"number": 8, "text": "      {:ok, transfer} ->"},
+        {"number": 9, "text": "        conn"},
+        {"number": 10, "text": "        |> put_status(:created)"},
+        {"number": 11, "text": "        |> render(:show, transfer: transfer)"},
+        {"number": 12, "text": ""},
+        {"number": 13, "text": "      {:error, :insufficient_funds} ->"},
+        {"number": 14, "text": "        conn"},
+        {"number": 15, "text": "        |> put_status(:unprocessable_entity)"},
+        {"number": 16, "text": "        |> json(%{error: \"insufficient_funds\"})"},
+        {"number": 17, "text": "    end"},
+        {"number": 18, "text": "  end"}
+      ]
+    },
+    {
+      "id": "transfers-execute",
+      "file": "lib/shop/transfers.ex",
+      "symbol": "Transfers.execute/1",
+      "diff": [
+        "diff --git a/lib/shop/transfers.ex b/lib/shop/transfers.ex",
+        "new file mode 100644",
+        "--- /dev/null",
+        "+++ b/lib/shop/transfers.ex",
+        "@@ -0,0 +22,13 @@",
+        "+  defp execute(command) do",
+        "+    Repo.transaction(fn ->",
+        "+      with {:ok, from, to} <-",
+        "+             Accounts.lock_pair(command.from_id, command.to_id),",
+        "+           :ok <- Money.ensure_available(from.balance, command.amount),",
+        "+           {:ok, _accounts} <- Accounts.move(from, to, command.amount),",
+        "+           {:ok, transfer} <- Ledger.record(command) do",
+        "+        transfer",
+        "+      else",
+        "+        {:error, reason} -> Repo.rollback(reason)",
+        "+      end",
+        "+    end)",
+        "+  end"
+      ],
+      "lines": [
+        {"number": 22, "text": "  defp execute(command) do"},
+        {"number": 23, "text": "    Repo.transaction(fn ->"},
+        {"number": 24, "text": "      with {:ok, from, to} <-"},
+        {"number": 25, "text": "             Accounts.lock_pair(command.from_id, command.to_id),"},
+        {"number": 26, "text": "           :ok <- Money.ensure_available(from.balance, command.amount),"},
+        {"number": 27, "text": "           {:ok, _accounts} <- Accounts.move(from, to, command.amount),"},
+        {"number": 28, "text": "           {:ok, transfer} <- Ledger.record(command) do"},
+        {"number": 29, "text": "        transfer"},
+        {"number": 30, "text": "      else"},
+        {"number": 31, "text": "        {:error, reason} -> Repo.rollback(reason)"},
+        {"number": 32, "text": "      end"},
+        {"number": 33, "text": "    end)"},
+        {"number": 34, "text": "  end"}
+      ]
+    }
+  ],
+  "stops": [
+    {
+      "id": "controller-happy",
+      "title": "Return a created transfer",
+      "scenario": "happy path",
+      "sourceFrameId": "controller-create",
+      "focusBlocks": [
+        {
+          "id": "accept-request",
+          "title": "Accept and dispatch the request",
+          "ranges": [{"start": 6, "end": 7}],
+          "language": [
+            {
+              "token": "%{\"transfer\" => params}",
+              "origin": "Elixir map pattern",
+              "meaning": "Require the transfer key. Bind its value to params.",
+              "why": "The action accepts only the expected request shape.",
+              "alternatives": ["Map.fetch/2 for an explicit error"]
+            },
+            {
+              "token": "case",
+              "origin": "Elixir special form",
+              "meaning": "Run one expression. Select the branch that matches its result.",
+              "why": "The transfer operation can return success or failure.",
+              "alternatives": ["with for one main success path"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "read the transfer parameters",
+              "run the transfer operation",
+              "select a response from the result"
+            ],
+            "effect": "The controller sends the request data to the domain operation.",
+            "reason": "The controller must translate a domain result into an HTTP response.",
+            "removed": "The endpoint cannot start a transfer."
+          },
+          "evidence": {
+            "state": "exercised",
+            "testIds": ["happy-transfer", "insufficient-funds"]
+          }
+        },
+        {
+          "id": "created-response",
+          "title": "Build the success response",
+          "ranges": [{"start": 8, "end": 11}],
+          "language": [
+            {
+              "token": "{:ok, transfer}",
+              "origin": "Elixir tuple pattern",
+              "meaning": "Match a successful result. Bind the transfer value.",
+              "why": "The success branch needs the created transfer.",
+              "alternatives": ["a function clause for each result"]
+            },
+            {
+              "token": "|>",
+              "origin": "Elixir pipe operator",
+              "meaning": "Pass the connection to the next function.",
+              "why": "The response changes the same connection in two steps.",
+              "alternatives": ["nested function calls"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "when the transfer succeeds",
+              "set HTTP status 201",
+              "render the created transfer"
+            ],
+            "effect": "The client receives status 201 and the transfer data.",
+            "reason": "A create request must identify the new resource.",
+            "removed": "A successful transfer has no valid HTTP response."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["happy-transfer"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "domain-happy",
+      "title": "Move and record the money",
+      "scenario": "happy path",
+      "sourceFrameId": "transfers-execute",
+      "focusBlocks": [
+        {
+          "id": "transaction",
+          "title": "Open one transaction",
+          "ranges": [{"start": 23, "end": 23}],
+          "language": [
+            {
+              "token": "Repo.transaction/1",
+              "origin": "Ecto.Repo API",
+              "meaning": "Run the function in one database transaction.",
+              "why": "The balance writes and ledger writes must commit together.",
+              "alternatives": ["Ecto.Multi for named transaction steps"]
+            },
+            {
+              "token": "fn ->",
+              "origin": "Elixir anonymous function",
+              "meaning": "Create a function with no arguments.",
+              "why": "Repo runs this function inside the transaction.",
+              "alternatives": ["an Ecto.Multi value"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "open a database transaction",
+              "run all transfer steps inside it"
+            ],
+            "effect": "The database treats the transfer steps as one unit.",
+            "reason": "A transfer must commit all writes or no writes.",
+            "removed": "A failed transfer can leave partial data."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["insufficient-funds"]
+          }
+        },
+        {
+          "id": "success-chain",
+          "title": "Run the success chain",
+          "ranges": [{"start": 24, "end": 29}],
+          "language": [
+            {
+              "token": "with",
+              "origin": "Elixir special form",
+              "meaning": "Continue while each result matches its pattern.",
+              "why": "The operation has one main success path and several exits.",
+              "alternatives": ["nested case expressions", "Ecto.Multi"]
+            },
+            {
+              "token": "<-",
+              "origin": "Elixir with operator",
+              "meaning": "Match a result. Stop the chain when it does not match.",
+              "why": "A failed step must skip all later steps.",
+              "alternatives": ["= when a mismatch must raise"]
+            },
+            {
+              "token": "_accounts",
+              "origin": "Elixir ignored binding",
+              "meaning": "Match the returned accounts. Mark the value as unused.",
+              "why": "The next step needs only the success signal.",
+              "alternatives": ["_ to ignore the value completely"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "lock both accounts",
+              "check the sender balance",
+              "move the money",
+              "record the transfer",
+              "return the transfer"
+            ],
+            "effect": "The operation changes both balances and writes the ledger records.",
+            "reason": "A valid transfer must change money and create an audit record.",
+            "removed": "The API can report success without a complete transfer."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["happy-transfer"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "domain-failure",
+      "title": "Reject an unsafe transfer",
+      "scenario": "insufficient funds",
+      "sourceFrameId": "transfers-execute",
+      "focusBlocks": [
+        {
+          "id": "atomic-rollback",
+          "title": "Connect the transaction to rollback",
+          "ranges": [
+            {"start": 23, "end": 23},
+            {"start": 30, "end": 31}
+          ],
+          "language": [
+            {
+              "token": "else",
+              "origin": "Elixir with clause",
+              "meaning": "Handle the first value that did not match the with chain.",
+              "why": "All transfer errors use one rollback exit.",
+              "alternatives": ["one else branch for each error shape"]
+            },
+            {
+              "token": "Repo.rollback/1",
+              "origin": "Ecto.Repo API",
+              "meaning": "Abort the active transaction. Return the reason.",
+              "why": "An error must remove earlier writes in this transaction.",
+              "alternatives": ["Ecto.Multi error handling"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "open one transaction",
+              "if any step fails",
+              "roll back every write"
+            ],
+            "effect": "One error cancels all writes from this transfer.",
+            "reason": "A rejected transfer must leave the database unchanged.",
+            "removed": "An error can leave a debit or a ledger record behind."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["insufficient-funds"]
+          }
+        },
+        {
+          "id": "lock-pair",
+          "title": "Lock both account rows",
+          "ranges": [{"start": 24, "end": 25}],
+          "language": [
+            {
+              "token": "Accounts.lock_pair/2",
+              "origin": "Project function",
+              "meaning": "Load and lock the sender and receiver rows.",
+              "why": "Concurrent transfers must not use the same old balance.",
+              "alternatives": ["optimistic locking", "a conditional SQL update"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "lock the sender row",
+              "lock the receiver row"
+            ],
+            "effect": "Other transactions must wait before they change these accounts.",
+            "reason": "Two requests must not spend the same old balance.",
+            "removed": "Concurrent requests can both approve the same funds."
+          },
+          "evidence": {
+            "state": "unlinked",
+            "testIds": []
+          }
+        },
+        {
+          "id": "funds-check",
+          "title": "Stop when funds are insufficient",
+          "ranges": [{"start": 26, "end": 26}],
+          "language": [
+            {
+              "token": ":ok <-",
+              "origin": "Elixir with pattern",
+              "meaning": "Continue only when the check returns :ok.",
+              "why": "An error must stop the money movement.",
+              "alternatives": ["a case expression"]
+            },
+            {
+              "token": "Money.ensure_available/2",
+              "origin": "Project function",
+              "meaning": "Compare the sender balance with the requested amount.",
+              "why": "The sender balance must not become negative.",
+              "alternatives": ["a conditional database update"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "compare the balance with the amount",
+              "return an error when the amount is too large"
+            ],
+            "effect": "The operation stops before it moves unavailable money.",
+            "reason": "The sender cannot spend more money than it has.",
+            "removed": "The sender balance can become negative."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["insufficient-funds"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "controller-failure",
+      "title": "Return a stable failure",
+      "scenario": "insufficient funds",
+      "sourceFrameId": "controller-create",
+      "focusBlocks": [
+        {
+          "id": "unprocessable-response",
+          "title": "Translate the domain error",
+          "ranges": [{"start": 13, "end": 16}],
+          "language": [
+            {
+              "token": "{:error, :insufficient_funds}",
+              "origin": "Elixir tuple pattern",
+              "meaning": "Match the known insufficient-funds error.",
+              "why": "This domain error needs one stable HTTP meaning.",
+              "alternatives": ["a fallback controller for shared errors"]
+            },
+            {
+              "token": ":unprocessable_entity",
+              "origin": "Phoenix status atom",
+              "meaning": "Set HTTP status 422.",
+              "why": "The request is valid, but the transfer cannot be processed.",
+              "alternatives": ["the integer 422"]
+            }
+          ],
+          "intent": {
+            "pseudocode": [
+              "when funds are insufficient",
+              "set HTTP status 422",
+              "return the error name"
+            ],
+            "effect": "The client receives a stable failure response.",
+            "reason": "The client must distinguish this rejection from a server error.",
+            "removed": "The domain error has no public HTTP contract."
+          },
+          "evidence": {
+            "state": "asserted",
+            "testIds": ["insufficient-funds"]
+          }
+        }
+      ]
+    }
+  ]
+}
