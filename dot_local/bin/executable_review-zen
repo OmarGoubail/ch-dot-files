@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-tool_dir="$HOME/.pi/agent/tools/review-zen"
+tool_dir="$HOME/.local/share/review-zen"
 exec bun run "$tool_dir/src/index.tsx" "$@"

@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 
-# dependency-lock: {{ include "private_dot_pi/private_agent/tools/review-zen/bun.lock" | sha256sum }}
-tool_dir="$HOME/.pi/agent/tools/review-zen"
+# dependency-lock: {{ include "dot_local/share/review-zen/bun.lock" | sha256sum }}
+tool_dir="$HOME/.local/share/review-zen"
 
 if [ ! -d "$tool_dir" ]; then
   exit 0

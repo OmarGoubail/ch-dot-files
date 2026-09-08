@@ -16,8 +16,8 @@
 - [x] Add `/profile status` with model availability/auth diagnostics.
 - [x] Remove persona prompt injection and model-family prompt selection.
 - [x] Remove obsolete orchestrator prompt variants and custom `oracle.md`.
-- [x] Use `pi-subagents` built-in agents with profile-driven overrides.
-- [x] Use built-in `scout`, `worker`, `reviewer`, and `oracle`; remove redundant custom agents.
+- [x] Replace `pi-subagents` with bounded Herdr-backed Pi child sessions.
+- [x] Bundle `scout`, `researcher`, `planner`, `reviewer`, `oracle`, and `worker` roles with profile-driven runtime policy.
 
 ## Dannote adoption
 
