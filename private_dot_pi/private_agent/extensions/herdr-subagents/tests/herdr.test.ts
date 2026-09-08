@@ -15,15 +15,12 @@ test("delegation submits a fixed command instead of prompt text through argv", a
 	process.env.HERDR_TEST_ARGS = capture;
 	try {
 		const client = new HerdrClient(binary);
-		await client.delegate({ target: "probe", timeoutMs: 1_000 });
+		await client.delegate({ target: "probe" });
 		assert.deepEqual(readFileSync(capture, "utf8").trim().split("\n"), [
 			"agent",
 			"prompt",
 			"probe",
 			"/herdr-delegate",
-			"--wait",
-			"--timeout",
-			"1000",
 		]);
 	} finally {
 		if (previousCapture === undefined) delete process.env.HERDR_TEST_ARGS;

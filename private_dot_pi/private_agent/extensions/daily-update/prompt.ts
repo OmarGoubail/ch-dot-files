@@ -67,10 +67,12 @@ export function normalizeDailyUpdateDraft(value: string, weekday: string): strin
 	const headingIndex = unfenced.indexOf(expectedHeading);
 	if (headingIndex < 0) throw new Error(`Generated update is missing the heading '${expectedHeading}'.`);
 	const draft = unfenced.slice(headingIndex).trim();
-	const lines = draft.split("\n");
+	const lines = draft.split("\n").map((line, index) => index === 0
+		? line
+		: line.replace(/^\s*[-*+]\s+\[x\]\s+/i, "[x] "));
 	const invalidContent = lines.slice(1).find((line) => line.trim() && !line.startsWith("[x] "));
 	if (invalidContent) throw new Error(`Generated update contains unexpected content: ${invalidContent}`);
-	return draft;
+	return lines.join("\n");
 }
 
 function boundedPromptEvidence(evidence: DailyWorkEvidence): string {

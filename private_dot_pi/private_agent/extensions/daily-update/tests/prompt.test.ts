@@ -45,6 +45,10 @@ test("normalizes fenced output and rejects content outside the required bullet f
 		normalizeDailyUpdateDraft("```markdown\nStuff I did on Monday\n\n[x] Reviewed PC-123\n```", "Monday"),
 		"Stuff I did on Monday\n\n[x] Reviewed PC-123",
 	);
+	assert.equal(
+		normalizeDailyUpdateDraft("Stuff I did on Monday\n\n- [x] Implemented CORE-788", "Monday"),
+		"Stuff I did on Monday\n\n[x] Implemented CORE-788",
+	);
 	assert.throws(
 		() => normalizeDailyUpdateDraft("Stuff I did on Monday\n\nHere is the update\n[x] Reviewed PC-123", "Monday"),
 		/unexpected content/,

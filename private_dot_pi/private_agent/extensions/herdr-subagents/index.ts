@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +7,7 @@ import { SessionManager, type ExtensionAPI, type ExtensionContext } from "@earen
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { getProfileRegistry, modelPolicyError, parseModelSpec, profileSelectionFromEntries, type ModelPolicy, type Profile, type ThinkingLevel } from "../shared/profile-registry.ts";
+import { readChildState, waitForTerminalChildState } from "./child-state.ts";
 import { KeyedMutex, Semaphore } from "./concurrency.ts";
 import { HerdrClient, type HerdrTab } from "./herdr.ts";
 import { formatCost, formatUsage, latestBySession, nextSegment, recordsFromEntries, RUN_ENTRY_TYPE, totalUsage } from "./ledger.ts";
@@ -75,23 +76,6 @@ function linkedAbortSignal(signals: Array<AbortSignal | undefined>): { signal: A
 	};
 }
 
-function readChildState(path: string): ChildState | undefined {
-	try {
-		const parsed = JSON.parse(readFileSync(path, "utf8")) as ChildState;
-		return parsed?.version === 1 ? parsed : undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-async function settledChildState(path: string): Promise<ChildState | undefined> {
-	for (let attempt = 0; attempt < 20; attempt += 1) {
-		const state = readChildState(path);
-		if (state && !["starting", "running"].includes(state.status)) return state;
-		await new Promise((resolve) => setTimeout(resolve, 50));
-	}
-	return readChildState(path);
-}
 
 function response(record: AgentRunRecord, history?: string) {
 	const result = history ?? (record.latestAssistant || "(no assistant result was recorded)");
@@ -302,13 +286,15 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 			});
 			await herdr.delegate({
 				target: agentName,
+				signal: linked.signal,
+			});
+			childState = await waitForTerminalChildState(statePath, {
 				timeoutMs: input.role.timeoutMinutes * 60_000,
 				signal: linked.signal,
 			});
-			childState = await settledChildState(statePath);
 		} catch (error) {
 			launchError = error;
-			childState = await settledChildState(statePath);
+			childState = readChildState(statePath);
 		} finally {
 			if (tabId) {
 				try { await herdr.closeTab(tabId); } catch (error) { launchError ??= error; }
