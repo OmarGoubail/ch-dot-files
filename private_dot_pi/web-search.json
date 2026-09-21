@@ -11,5 +11,8 @@
       "invalid-response",
       "unsupported"
     ]
+  },
+  "fetchRouting": {
+    "allowRemoteHostedProviders": true
   }
 }
