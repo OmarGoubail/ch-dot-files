@@ -4,33 +4,30 @@
     "work": {
       "model": "openai-codex-work/gpt-5.6-sol",
       "thinking": "medium",
-      "allowed_providers": [
-        "openai-codex-work",
-        "fireworks"
-      ],
+      "allowed_providers": ["openai-codex-work", "fireworks"],
       "subagents": {
         "oracle": {
-          "model": "openai-codex-work/gpt-5.6-sol",
-          "thinking": "xhigh"
+          "model": "openai-codex-work/gpt-6-astra",
+          "thinking": "high"
         },
         "planner": {
           "model": "openai-codex-work/gpt-5.6-sol",
           "thinking": "high"
         },
         "reviewer": {
-          "model": "openai-codex-work/gpt-5.6-luna",
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4p1-flash",
           "thinking": "xhigh"
         },
         "scout": {
-          "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4p1-flash",
           "thinking": "off"
         },
         "worker": {
-          "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4p1-flash",
           "thinking": "high"
         },
         "researcher": {
-          "model": "fireworks/accounts/fireworks/models/deepseek-v4-flash-0731",
+          "model": "fireworks/accounts/fireworks/models/deepseek-v4p1-flash",
           "thinking": "off"
         }
       }
@@ -38,10 +35,7 @@
     "personal": {
       "model": "openai-codex-personal/gpt-5.6-luna",
       "thinking": "xhigh",
-      "allowed_providers": [
-        "openai-codex-personal",
-        "opencode-go"
-      ],
+      "allowed_providers": ["openai-codex-personal", "opencode-go"],
       "subagents": {
         "oracle": {
           "model": "openai-codex-personal/gpt-5.6-sol",
@@ -56,15 +50,15 @@
           "thinking": "high"
         },
         "scout": {
-          "model": "opencode-go/deepseek-v4-flash",
+          "model": "opencode-go/deepseek-v4.1-flash",
           "thinking": "off"
         },
         "worker": {
-          "model": "opencode-go/deepseek-v4-flash",
+          "model": "opencode-go/deepseek-v4.1-flash",
           "thinking": "high"
         },
         "researcher": {
-          "model": "opencode-go/deepseek-v4-flash",
+          "model": "opencode-go/deepseek-v4.1-flash",
           "thinking": "off"
         }
       }

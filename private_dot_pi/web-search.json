@@ -1,6 +1,15 @@
 {
-  "provider": "exa",
   "workflow": "none",
-  "searchModel": "opencode-go/deepseek-v4-flash",
-  "curatorTimeoutSeconds": 30
+  "searchModel": "opencode-go/deepseek-v4.1-flash",
+  "curatorTimeoutSeconds": 30,
+  "searchRouting": {
+    "providers": ["duckduckgo", "parallel-mcp", "exa", "openai"],
+    "fallbackOn": [
+      "transient",
+      "quota",
+      "network",
+      "invalid-response",
+      "unsupported"
+    ]
+  }
 }
