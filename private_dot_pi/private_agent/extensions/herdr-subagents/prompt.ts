@@ -143,7 +143,8 @@ export function runtimeSystemPrompt(role: AgentRole): string {
 		`You are running as the '${role.name}' child in a parent-owned delegation.`,
 		`You have at most ${role.maxTurns} assistant turns for this run segment. Reserve your final turn for the requested result.`,
 		"The parent owns product decisions, permissions, and final synthesis. Return unresolved decisions or required protected actions instead of asking the human directly.",
-		"When a command is blocked, use a safe alternative or report the exact parent action required.",
+		"In autonomous mode, a GitHub checkpoint may be acknowledged for one exact command only after scope, exact content/diff, and relevant checks are verified. Follow the blocked result's acknowledgement instructions; never treat this as human approval.",
+		"When human approval is required, report the exact pending action and end your turn. Do not retry, bypass the guard, or wait for a human modal.",
 		"Finish with the requested output rather than proposing another subagent.",
 	].join("\n");
 }

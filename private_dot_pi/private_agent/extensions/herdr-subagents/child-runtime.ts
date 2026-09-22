@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import herdrAgentState from "../herdr-agent-state.ts";
-import { loadCommandRules, matchCommandRule } from "../dannote/confirm-actions.ts";
+import { registerCommandGuard } from "../dannote/confirm-actions.ts";
 import { messageText } from "./prompt.ts";
 import type { AgentStatus, ChildState } from "./types.ts";
 import { EMPTY_USAGE } from "./types.ts";
@@ -50,7 +50,10 @@ function usageFromMessage(message: unknown) {
 
 export default function childRuntime(pi: ExtensionAPI): void {
 	herdrAgentState(pi);
-	if (process.env.HERDR_SUBAGENT_CHILD !== "1") return;
+	if (process.env.HERDR_SUBAGENT_CHILD !== "1") {
+		registerCommandGuard(pi);
+		return;
+	}
 
 	const statePath = process.env.HERDR_SUBAGENT_STATE_PATH;
 	const promptPath = process.env.HERDR_SUBAGENT_PROMPT_PATH;
@@ -58,7 +61,6 @@ export default function childRuntime(pi: ExtensionAPI): void {
 	const sessionId = process.env.HERDR_SUBAGENT_SESSION_ID ?? "";
 	const maxTurns = envInteger("HERDR_SUBAGENT_MAX_TURNS", 15);
 	const providers = allowedProviders();
-	let commandRules = loadCommandRules(process.cwd());
 	let budgetReached = false;
 	let synthesisInjected = false;
 	let state: ChildState = {
@@ -116,7 +118,6 @@ export default function childRuntime(pi: ExtensionAPI): void {
 	});
 
 	pi.on("session_start", (_event, ctx) => {
-		commandRules = loadCommandRules(ctx.cwd);
 		state.sessionId = ctx.sessionManager.getSessionId() || sessionId;
 		state.sessionPath = ctx.sessionManager.getSessionFile();
 		state.actualModel = actualModel(ctx);
@@ -140,15 +141,12 @@ export default function childRuntime(pi: ExtensionAPI): void {
 		else save();
 	});
 
-	pi.on("tool_call", (event, ctx) => {
-		if (event.toolName !== "bash") return;
-		const command = typeof event.input.command === "string" ? event.input.command : "";
-		const match = matchCommandRule(command, commandRules, ctx.cwd);
-		if (!match) return;
-		const reason = `${match.label} requires parent approval. Use a safe alternative or return the exact action the parent must perform.`;
-		state.blockedActions.push(`${match.label}: ${command}`);
-		save();
-		return { block: true, reason };
+	registerCommandGuard(pi, {
+		child: true,
+		onBlocked: (action) => {
+			state.blockedActions.push(action);
+			save();
+		},
 	});
 
 	pi.on("context", (event) => {

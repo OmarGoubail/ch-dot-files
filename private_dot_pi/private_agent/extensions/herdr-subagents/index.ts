@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { SessionManager, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { confirmActionsMode } from "../dannote/confirm-actions.ts";
 import { getProfileRegistry, modelPolicyError, parseModelSpec, profileSelectionFromEntries, type ModelPolicy, type Profile, type ThinkingLevel } from "../shared/profile-registry.ts";
 import { readChildState, waitForTerminalChildState } from "./child-state.ts";
 import { KeyedMutex, Semaphore } from "./concurrency.ts";
@@ -258,6 +259,7 @@ export default function herdrSubagents(pi: ExtensionAPI): void {
 				env: {
 					PI_FFF_MODE: "override",
 					HERDR_SUBAGENT_CHILD: "1",
+					PI_CONFIRM_ACTIONS_MODE: confirmActionsMode(input.ctx),
 					HERDR_SUBAGENT_ROLE: input.role.name,
 					HERDR_SUBAGENT_SESSION_ID: input.sessionId,
 					HERDR_SUBAGENT_STATE_PATH: statePath,

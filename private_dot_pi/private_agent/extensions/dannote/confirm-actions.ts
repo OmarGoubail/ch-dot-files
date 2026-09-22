@@ -1,19 +1,21 @@
 /**
  * Confirm Actions Extension
  *
- * Prompts for confirmation before configured publish/mutate shell commands and
- * session actions that need explicit user approval.
+ * GitHub mutations use a single-command agent checkpoint by default; strict mode
+ * requires human approval. Recursive removal of home/root always needs approval.
+ * This is a workflow guard, not a shell sandbox.
  */
 
-import { lstatSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { basename, resolve } from 'node:path'
 import type {
   ExtensionAPI,
   SessionBeforeSwitchEvent,
+  ExtensionContext,
   SessionMessageEntry
 } from '@earendil-works/pi-coding-agent'
 import { isToolCallEventType } from '@earendil-works/pi-coding-agent'
+import { Type } from 'typebox'
 import {
   parse as parseShell,
   type ArithmeticExpression,
@@ -38,11 +40,16 @@ const GITHUB_RULES: CommandRule[] = [
   exact(['gh', 'pr', 'edit'], 'Edit GitHub PR'),
   exact(['gh', 'pr', 'comment'], 'Publish GitHub PR comment'),
   exact(['gh', 'pr', 'review'], 'Publish GitHub PR review'),
+  exact(['gh', 'pr', 'close'], 'Close GitHub PR'),
+  exact(['gh', 'pr', 'reopen'], 'Reopen GitHub PR'),
+  exact(['gh', 'pr', 'merge'], 'Merge GitHub PR'),
+  exact(['gh', 'pr', 'ready'], 'Mark GitHub PR ready'),
   exact(['gh', 'issue', 'create'], 'Create GitHub issue'),
   exact(['gh', 'issue', 'edit'], 'Edit GitHub issue'),
   exact(['gh', 'issue', 'comment'], 'Publish GitHub issue comment'),
   exact(['gh', 'issue', 'close'], 'Close GitHub issue'),
   exact(['gh', 'issue', 'delete'], 'Delete GitHub issue'),
+  exact(['gh', 'issue', 'reopen'], 'Reopen GitHub issue'),
   exact(['gh', 'repo', 'create'], 'Create GitHub repo'),
   exact(['gh', 'repo', 'delete'], 'Delete GitHub repo'),
   exact(['gh', 'repo', 'archive'], 'Archive GitHub repo'),
@@ -57,85 +64,117 @@ const GITHUB_RULES: CommandRule[] = [
   matched(['gh', 'api'], 'Mutate via GitHub API', isMutatingGhApi)
 ]
 
-const GITLAB_RULES: CommandRule[] = [
-  exact(['glab', 'mr', 'create'], 'Publish GitLab MR'),
-  exact(['glab', 'mr', 'update'], 'Edit GitLab MR'),
-  exact(['glab', 'mr', 'note'], 'Publish GitLab MR comment'),
-  exact(['glab', 'issue', 'create'], 'Publish GitLab issue'),
-  exact(['glab', 'issue', 'update'], 'Edit GitLab issue'),
-  exact(['glab', 'issue', 'note'], 'Publish GitLab issue comment'),
-  exact(['glab', 'issue', 'close'], 'Close GitLab issue'),
-  exact(['glab', 'issue', 'delete'], 'Delete GitLab issue'),
-  exact(['glab', 'release', 'create'], 'Publish GitLab release')
-]
-
-const GMAIL_RULES: CommandRule[] = [matched(['gws', 'gmail'], 'Mutate Gmail', isMutatingGmail)]
-
-const TWITTER_RULES: CommandRule[] = [
-  matched(['bird'], 'Mutate X/Twitter', isMutatingBird),
-  matched(['bunx', '@dannote/bird-premium'], 'Mutate X/Twitter', isMutatingBird)
-]
-
-const GIT_RULES: CommandRule[] = [
-  matched(['git'], 'Delete remote branch', isGitRemoteBranchDelete),
-  matched(['git'], 'Hard reset', isGitHardReset),
-  matched(['git'], 'Clean working tree', isGitForcedClean),
-  matched(['git'], 'Force-delete local branch', isGitBranchDelete)
-]
-
 const FILESYSTEM_RULES: CommandRule[] = [
-  matched(['rm'], 'Broad recursive removal', isBroadRecursiveRemoval)
+  matched(['rm'], 'Recursive removal of home or root', isCatastrophicRemoval)
 ]
-
-const PACKAGE_PUBLISH_RULES: CommandRule[] = [
-  matched(['npm'], 'Publish npm package', hasSubcommand('publish')),
-  matched(['pnpm'], 'Publish npm package', hasSubcommand('publish')),
-  matched(['bun'], 'Publish package', hasSubcommand('publish')),
-  matched(['yarn'], 'Publish npm package', hasSubcommand('npm', 'publish'))
-]
-
-const DEPLOY_RULES: CommandRule[] = [
-  exact(['vercel'], 'Deploy with Vercel'),
-  matched(['netlify'], 'Deploy with Netlify', hasSubcommand('deploy')),
-  matched(['firebase'], 'Deploy with Firebase', hasSubcommand('deploy')),
-  matched(['fly'], 'Deploy with Fly.io', hasSubcommand('deploy')),
-  matched(['wrangler'], 'Deploy with Wrangler', hasAnySubcommand(['deploy', 'publish']))
-]
-
-const EXECUTION_SURFACE_RULES: CommandRule[] = [
-  matched(['bash'], 'Run shell command string', isShellCommandString),
-  matched(['sh'], 'Run shell command string', isShellCommandString),
-  matched(['zsh'], 'Run shell command string', isShellCommandString),
-  matched(['eval'], 'Run shell eval', () => true),
-  matched(['source'], 'Source shell script', () => true),
-  matched(['.'], 'Source shell script', () => true),
-  matched(['alias'], 'Define shell alias', () => true),
-  matched(['find'], 'Run find -exec command', hasAnySubcommand(['-exec', '-execdir'])),
-  matched(['xargs'], 'Run xargs protected command', isXargsProtectedCommand)
-]
-
-const RULE_GROUPS = {
-  github: GITHUB_RULES,
-  gitlab: GITLAB_RULES,
-  gmail: GMAIL_RULES,
-  twitter: TWITTER_RULES,
-  git: GIT_RULES,
-  filesystem: FILESYSTEM_RULES,
-  publish: PACKAGE_PUBLISH_RULES,
-  deploy: DEPLOY_RULES,
-  execution: EXECUTION_SURFACE_RULES
-} satisfies Record<string, CommandRule[]>
-
-type RuleGroupName = keyof typeof RULE_GROUPS
-
-type ConfirmActionGroups = Partial<Record<RuleGroupName, boolean>>
 
 export const DEFAULT_COMMAND_RULES: CommandRule[] = buildDefaultCommandRules()
 
-export function buildDefaultCommandRules(groups: ConfirmActionGroups = {}): CommandRule[] {
-  return Object.entries(RULE_GROUPS).flatMap(([name, rules]) =>
-    groups[name as RuleGroupName] === false ? [] : rules
-  )
+export function buildDefaultCommandRules(): CommandRule[] {
+  return [...FILESYSTEM_RULES, ...GITHUB_RULES]
+}
+
+export type ConfirmActionsMode = 'autonomous' | 'strict'
+const MODE_ENTRY = 'confirm-actions-mode'
+
+export function confirmActionsMode(ctx: Pick<ExtensionContext, 'sessionManager'>): ConfirmActionsMode {
+  // A continued child must inherit the parent's current mode, not its old one.
+  if (process.env.HERDR_SUBAGENT_CHILD === '1') {
+    return process.env.PI_CONFIRM_ACTIONS_MODE === 'strict' ? 'strict' : 'autonomous'
+  }
+  for (const entry of [...ctx.sessionManager.getBranch()].reverse()) {
+    if (entry.type === 'custom' && entry.customType === MODE_ENTRY) {
+      const mode = (entry.data as { mode?: unknown })?.mode
+      if (mode === 'strict' || mode === 'autonomous') return mode
+    }
+  }
+  return 'autonomous'
+}
+
+export function registerCommandGuard(
+  pi: ExtensionAPI,
+  options: { child?: boolean; onBlocked?: (action: string) => void } = {}
+) {
+  let commandRules = DEFAULT_COMMAND_RULES
+  const checkpoints = new Map<string, 'pending' | 'acknowledged'>()
+  const keyFor = (command: string, cwd: string) => JSON.stringify([cwd, command])
+
+  pi.on('session_start', (_event, ctx) => {
+    commandRules = loadCommandRules(ctx.cwd)
+    checkpoints.clear()
+  })
+  pi.on('agent_start', () => { checkpoints.clear() })
+  pi.on('agent_end', () => { checkpoints.clear() })
+
+  pi.registerCommand('confirm-actions', {
+    description: 'Set session approval mode: autonomous or strict (inherited by subagents)',
+    handler: async (args, ctx) => {
+      const mode = args.trim()
+      if (options.child || (mode !== 'autonomous' && mode !== 'strict')) {
+        ctx.ui.notify(`Mode: ${confirmActionsMode(ctx)}. Usage: /confirm-actions autonomous|strict`, 'info')
+        return
+      }
+      checkpoints.clear()
+      pi.appendEntry(MODE_ENTRY, { mode })
+      ctx.ui.notify(`Confirm actions: ${mode}`, 'info')
+    }
+  })
+
+  pi.registerTool({
+    name: 'acknowledge_github_action',
+    label: 'Acknowledge GitHub action',
+    description: 'Acknowledge one exact GitHub bash command after its checkpoint blocks it. Only proceed within requested scope, after reviewing exact content/diff and passing relevant checks. This is agent acknowledgement, not human approval.',
+    parameters: Type.Object({
+      command: Type.String({ description: 'Exact blocked bash command, unchanged' }),
+      withinRequestedScope: Type.Literal(true),
+      exactContentReviewed: Type.Literal(true),
+      relevantChecksPassed: Type.Literal(true),
+      review: Type.String({ minLength: 1, description: 'Explain the authorized scope, content/diff reviewed, and checks passed' })
+    }),
+    async execute(_id, params, _signal, _update, ctx) {
+      const key = keyFor(params.command, ctx.cwd)
+      if (confirmActionsMode(ctx) !== 'autonomous' || checkpoints.get(key) !== 'pending') {
+        return { content: [{ type: 'text', text: 'No pending autonomous checkpoint for this exact command. Do not retry; report the pending action and end your turn.' }], details: {}, isError: true }
+      }
+      checkpoints.set(key, 'acknowledged')
+      return { content: [{ type: 'text', text: 'Acknowledged for one execution of this exact command in this working directory. Run it now; changes require a new checkpoint.' }], details: {} }
+    }
+  })
+
+  pi.on('tool_call', async (event, ctx) => {
+    if (!isToolCallEventType('bash', event)) return
+    const command = event.input.command
+    const match = matchCommandRule(command, commandRules, ctx.cwd)
+    if (!match) return
+    const key = keyFor(command, ctx.cwd)
+    if (GITHUB_RULES.includes(match) && confirmActionsMode(ctx) === 'autonomous') {
+      if (checkpoints.get(key) === 'acknowledged') {
+        checkpoints.delete(key)
+        return
+      }
+      const repeated = checkpoints.has(key)
+      checkpoints.set(key, 'pending')
+      return {
+        block: true,
+        ...(repeated ? { terminate: true } : {}),
+        reason: `${match.label}: agent checkpoint. Nothing ran. Only proceed within the user's requested scope, after reviewing the exact content/diff and passing relevant checks. Call acknowledge_github_action with this exact command and explicit review, then retry once. Otherwise report the action as pending approval and end your turn. Do not retry without acknowledgement.\nCommand: ${command}`
+      }
+    }
+
+    checkpoints.delete(key)
+    const pending = `${match.label}: ${command}`
+    if (options.child || !ctx.hasUI) {
+      options.onBlocked?.(pending)
+      return { block: true, terminate: true, reason: `Human approval required. Report this pending action and end your turn; do not retry or wait for a modal.\n${pending}` }
+    }
+    notifyDesktop(notificationTitle(ctx.cwd), `Approve: ${match.label}`)
+    const confirmed = await withHerdrBlocked(pi, match.label, () =>
+      ctx.ui.confirm(`${match.label}?`, `Review the exact command:\n\n${command}`)
+    )
+    if (!confirmed) {
+      return { block: true, terminate: true, reason: `User cancelled: ${match.label}. Report it as pending and end your turn; do not retry.` }
+    }
+  })
 }
 
 function exact(argv: string[], label: string): CommandRule {
@@ -153,34 +192,7 @@ function matched(
 const PREFIX_WRAPPERS = new Set(['sudo', 'command', 'env', 'noglob'])
 
 export default function (pi: ExtensionAPI) {
-  let commandRules = DEFAULT_COMMAND_RULES
-
-  pi.on('session_start', (_event, ctx) => {
-    commandRules = loadCommandRules(ctx.cwd)
-  })
-
-  pi.on('tool_call', async (event, ctx) => {
-    if (!isToolCallEventType('bash', event)) return
-
-    const command = event.input.command
-    const match = matchCommandRule(command, commandRules, ctx.cwd)
-    if (!match) return
-
-    if (!ctx.hasUI) {
-      return { block: true, reason: `${match.label} blocked (no UI for confirmation)` }
-    }
-
-    notifyDesktop(notificationTitle(ctx.cwd), `Approve: ${match.label}`)
-
-    const confirmed = await withHerdrBlocked(pi, match.label, () =>
-      ctx.ui.confirm(`${match.label}?`, 'Review the command before submitting.')
-    )
-
-    if (!confirmed) {
-      ctx.ui.notify(`${match.label} cancelled`, 'info')
-      return { block: true, reason: `User cancelled: ${match.label}` }
-    }
-  })
+  registerCommandGuard(pi)
 
   pi.on('session_before_switch', async (event: SessionBeforeSwitchEvent, ctx) => {
     if (!ctx.hasUI) return
@@ -244,13 +256,15 @@ export function matchCommandRule(
 ): CommandRule | undefined {
   const parsed = parseCommand(command)
 
-  for (const invocation of parsed.invocations) {
-    const normalized = normalizeInvocation(invocation.argv)
-    const match = rules.find((rule) => {
-      const comparable = normalizeToolInvocation(normalized, rule.argv)
-      return startsWithArgv(comparable, rule.argv) && (rule.matches?.(comparable, cwd) ?? true)
-    })
-    if (match) return match
+  // Check human-only rules first across the entire command: a GitHub checkpoint
+  // must never authorize a catastrophic rm (or a custom protected command).
+  const invocations = parsed.invocations.flatMap((invocation) => unwrapInvocation(invocation.argv))
+  const orderedRules = [...rules.filter((rule) => !GITHUB_RULES.includes(rule)), ...rules.filter((rule) => GITHUB_RULES.includes(rule))]
+  for (const rule of orderedRules) {
+    for (const argv of invocations) {
+      const comparable = normalizeToolInvocation(argv, rule.argv)
+      if (startsWithArgv(comparable, rule.argv) && (rule.matches?.(comparable, cwd) ?? true)) return rule
+    }
   }
 }
 
@@ -451,14 +465,28 @@ function isWord(value: unknown): value is Word {
   )
 }
 
-function isProtectedToolInvocation(argv: string[]): boolean {
-  const command = argv[0]
-  const isGitFetch = command === 'git' && getGitSubcommand(argv) === 'fetch'
-  return Boolean(
-    command &&
-    !isGitFetch &&
-    ['git', 'gh', 'glab', 'gws', 'bird', 'bunx', 'npm', 'pnpm', 'bun', 'yarn'].includes(command)
-  )
+function unwrapInvocation(argv: string[], depth = 0): string[][] {
+  const normalized = normalizeInvocation(argv)
+  if (depth >= 8) return [normalized]
+  const tool = normalized[0]
+  if (['bash', 'sh', 'zsh'].includes(tool)) {
+    const index = normalized.findIndex((arg, index) => index > 0 && /^-[^-]*c/.test(arg))
+    if (index > 0 && normalized[index + 1]) {
+      return [normalized, ...parseInvocations(normalized[index + 1]).flatMap((args) => unwrapInvocation(args, depth + 1))]
+    }
+  }
+  if (tool === 'eval') {
+    return [normalized, ...parseInvocations(normalized.slice(1).join(' ')).flatMap((args) => unwrapInvocation(args, depth + 1))]
+  }
+  if (tool === 'xargs') {
+    const index = findXargsCommandIndex(normalized)
+    if (index > 0) return [normalized, ...unwrapInvocation(normalized.slice(index), depth + 1)]
+  }
+  if (tool === 'find') {
+    const index = normalized.findIndex((arg) => arg === '-exec' || arg === '-execdir')
+    if (index > 0) return [normalized, ...unwrapInvocation(normalized.slice(index + 1), depth + 1)]
+  }
+  return [normalized]
 }
 
 function normalizeInvocation(argv: string[]): string[] {
@@ -473,7 +501,7 @@ function normalizeInvocation(argv: string[]): string[] {
     }
   }
 
-  return rest
+  return rest.length ? [basename(rest[0]), ...rest.slice(1)] : rest
 }
 
 function normalizeToolInvocation(argv: string[], ruleArgv: string[]): string[] {
@@ -531,34 +559,22 @@ function startsWithArgv(argv: string[], prefix: string[]): boolean {
 
 function isMutatingGhApi(argv: string[]): boolean {
   const method = getOptionValue(argv, ['--method', '-X'])?.toUpperCase()
-  if (method && method !== 'GET') return !isReadOnlyGhGraphqlQuery(argv)
-  if (method === 'GET') return false
-  if (isReadOnlyGhGraphqlQuery(argv)) return false
-  return argv.some((arg) => ['--field', '-f', '--raw-field', '-F'].includes(arg))
-}
-
-function isReadOnlyGhGraphqlQuery(argv: string[]): boolean {
-  if (!argv.slice(2).includes('graphql')) return false
-  const query = getGhApiField(argv, 'query')
-  if (!query) return false
-  return !/\bmutation(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*\{/i.test(query)
+  if (argv.includes('graphql')) {
+    const query = getGhApiField(argv, 'query')
+    // Only recognizable inline queries are read-only; files/variables are opaque.
+    return !query || !/^\s*(?:query\b|\{)/.test(query) || /\bmutation\b/.test(query)
+  }
+  if (method) return !['GET', 'HEAD', 'OPTIONS'].includes(method)
+  return argv.some((arg) => /^(?:--field|--raw-field|--input)(?:=|$)|^-[fF]/.test(arg))
 }
 
 function getGhApiField(argv: string[], name: string): string | undefined {
-  const flags = ['--field', '-f', '--raw-field', '-F']
   for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index] ?? ''
-    if (flags.includes(arg)) {
-      const value = argv[index + 1]
-      if (value?.startsWith(`${name}=`)) return value.slice(name.length + 1)
-    }
-    for (const flag of flags) {
-      const prefix = `${flag}=`
-      if (arg.startsWith(prefix)) {
-        const value = arg.slice(prefix.length)
-        if (value.startsWith(`${name}=`)) return value.slice(name.length + 1)
-      }
-    }
+    const arg = argv[index]
+    let value: string | undefined
+    if (['--field', '--raw-field', '-f', '-F'].includes(arg)) value = argv[index + 1]
+    else value = arg.match(/^(?:--field=|--raw-field=|-[fF]=?)(.*)$/)?.[1]
+    if (value?.startsWith(`${name}=`)) return value.slice(name.length + 1)
   }
 }
 
@@ -566,68 +582,7 @@ function isMutatingGhSubcommand(argv: string[]): boolean {
   return argv.some((arg) => ['add', 'delete', 'remove'].includes(arg))
 }
 
-function isMutatingGmail(argv: string[]): boolean {
-  if (hasAnyFlag(argv, ['--dry-run'])) return false
-
-  return argv.some((arg) =>
-    [
-      '+send',
-      '+reply',
-      '+reply-all',
-      '+forward',
-      'send',
-      'import',
-      'insert',
-      'trash',
-      'untrash',
-      'delete',
-      'batchDelete',
-      'modify',
-      'batchModify',
-      'create',
-      'update',
-      'patch'
-    ].includes(arg)
-  )
-}
-
-function isMutatingBird(argv: string[]): boolean {
-  return argv.some((arg) =>
-    [
-      'tweet',
-      'reply',
-      'delete',
-      'like',
-      'unlike',
-      'retweet',
-      'unretweet',
-      'bookmark',
-      'unbookmark',
-      'follow',
-      'unfollow'
-    ].includes(arg)
-  )
-}
-
-function isGitRemoteBranchDelete(argv: string[]): boolean {
-  return (
-    getGitSubcommand(argv) === 'push' && (argv.includes('--delete') || argv.some(isDeleteRefspec))
-  )
-}
-
-function isGitHardReset(argv: string[]): boolean {
-  return getGitSubcommand(argv) === 'reset' && hasAnyFlag(argv, ['--hard'])
-}
-
-function isGitForcedClean(argv: string[]): boolean {
-  return getGitSubcommand(argv) === 'clean' && hasAnyFlag(argv, ['-f', '--force'])
-}
-
-function isGitBranchDelete(argv: string[]): boolean {
-  return getGitSubcommand(argv) === 'branch' && hasAnyFlag(argv, ['-D'])
-}
-
-function isBroadRecursiveRemoval(argv: string[], cwd: string): boolean {
+function isCatastrophicRemoval(argv: string[], cwd: string): boolean {
   if (argv[0] !== 'rm') return false
 
   let parsingOptions = true
@@ -648,44 +603,13 @@ function isBroadRecursiveRemoval(argv: string[], cwd: string): boolean {
     targets.push(arg)
   }
 
-  return recursive && targets.some((target) => isBroadRemovalTarget(target, cwd))
-}
-
-function isBroadRemovalTarget(target: string, cwd: string): boolean {
-  const resolvedTarget = resolveRemovalTarget(target, cwd)
-  if (isTemporaryRemovalTarget(resolvedTarget, cwd)) return false
-  if (['/', '~', '~/', '.', './', '..', '../'].includes(target)) return true
-  if (/[?*{}\[\]]/.test(target) || target.endsWith('/') || /[$`]/.test(target)) return true
-  try {
-    return lstatSync(resolvedTarget).isDirectory()
-  } catch {
-    return false
-  }
-}
-
-function resolveRemovalTarget(target: string, cwd: string): string {
-  return target.startsWith('~/') && process.env.HOME
-    ? resolve(process.env.HOME, target.slice(2))
-    : resolve(cwd, target)
-}
-
-function isTemporaryRemovalTarget(target: string, cwd: string): boolean {
-  return [resolve(cwd, 'tmp'), resolve(tmpdir())].some((root) => isWithinDirectory(target, root))
-}
-
-function isWithinDirectory(target: string, root: string): boolean {
-  const relativeTarget = relative(root, target)
-  return relativeTarget === '' || (!relativeTarget.startsWith('..') && !isAbsolute(relativeTarget))
-}
-
-function isShellCommandString(argv: string[]): boolean {
-  return argv.some((arg) => arg === '-c' || arg.startsWith('-c') || hasFlag(arg, '-c'))
-}
-
-function isXargsProtectedCommand(argv: string[]): boolean {
-  const commandIndex = findXargsCommandIndex(argv)
-  if (commandIndex === -1) return false
-  return isProtectedToolInvocation(argv.slice(commandIndex))
+  return recursive && targets.some((target) => {
+    const home = resolve(homedir())
+    const expanded = target.replace(/^(?:~|\$HOME|\$\{HOME\})(?=\/|$)/, home)
+    // Broad globs at home/root also remove their contents; subdirectories are fine.
+    const path = resolve(cwd, expanded).replace(/\/(?:\*{1,2}|\.\*|\{[^/]*\})$/, '') || '/'
+    return path === '/' || path === home
+  })
 }
 
 function findXargsCommandIndex(argv: string[]): number {
@@ -721,53 +645,13 @@ function xargsFlagConsumesValue(arg: string): boolean {
   ].includes(arg)
 }
 
-function getGitSubcommand(argv: string[]): string | undefined {
-  let index = 1
-  while (index < argv.length) {
-    const arg = argv[index] ?? ''
-    if (isAssignment(arg)) {
-      index += 1
-      continue
-    }
-    if (!isFlag(arg)) return arg
-    index += flagConsumesValue(arg) ? 2 : 1
-  }
-}
-
-function hasSubcommand(...subcommand: string[]): (argv: string[]) => boolean {
-  return (argv) => findSubcommandIndex(argv, subcommand) !== -1
-}
-
-function hasAnySubcommand(subcommands: string[]): (argv: string[]) => boolean {
-  return (argv) => subcommands.some((subcommand) => findSubcommandIndex(argv, [subcommand]) !== -1)
-}
-
-function findSubcommandIndex(argv: string[], subcommand: string[]): number {
-  for (let index = 1; index <= argv.length - subcommand.length; index += 1) {
-    if (subcommand.every((part, offset) => argv[index + offset] === part)) return index
-  }
-  return -1
-}
-
-function hasAnyFlag(argv: string[], flags: string[]): boolean {
-  return argv.some((arg) => flags.some((flag) => hasFlag(arg, flag)))
-}
-
-function hasFlag(arg: string, flag: string): boolean {
-  if (arg === flag || arg.startsWith(`${flag}=`)) return true
-  return /^-[A-Za-z]+$/.test(arg) && /^-[A-Za-z]$/.test(flag) && arg.includes(flag.slice(1))
-}
-
-function isDeleteRefspec(arg: string): boolean {
-  return /^:[^:]+/.test(arg)
-}
-
 function getOptionValue(argv: string[], names: string[]): string | undefined {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index] ?? ''
     for (const name of names) {
       if (arg === name) return argv[index + 1]
       if (arg.startsWith(`${name}=`)) return arg.slice(name.length + 1)
+      if (/^-[^-]$/.test(name) && arg.startsWith(name) && arg.length > 2) return arg.slice(2)
     }
   }
 }
@@ -782,22 +666,7 @@ function isFlag(arg: string): boolean {
 
 export function loadCommandRules(cwd: string): CommandRule[] {
   const settings = readLayeredSettings(cwd)
-  const groups = Object.assign({}, ...settings.map((item) => readConfirmActionGroups(item)))
-  const customRules = settings.flatMap(readCommandRules)
-
-  return [...buildDefaultCommandRules(groups), ...customRules]
-}
-
-function readConfirmActionGroups(settings: Record<string, unknown>): ConfirmActionGroups {
-  if (!settings.confirmActionGroups || typeof settings.confirmActionGroups !== 'object') return {}
-
-  const groups: ConfirmActionGroups = {}
-  for (const [name, enabled] of Object.entries(settings.confirmActionGroups)) {
-    if (name in RULE_GROUPS && typeof enabled === 'boolean') {
-      groups[name as RuleGroupName] = enabled
-    }
-  }
-  return groups
+  return [...DEFAULT_COMMAND_RULES, ...settings.flatMap(readCommandRules)]
 }
 
 function readCommandRules(settings: Record<string, unknown>): CommandRule[] {
